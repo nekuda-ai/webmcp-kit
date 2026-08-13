@@ -17,7 +17,8 @@
       "homepage": "https://github.com/nekuda-ai/webmcp-kit",
       "repository": "https://github.com/nekuda-ai/webmcp-kit",
       "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"],
-      "category": "development"
+      "category": "development",
+      "license": "MIT"
     }
   ]
 }

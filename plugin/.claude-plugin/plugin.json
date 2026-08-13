@@ -7,5 +7,6 @@
   "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
   "homepage": "https://github.com/nekuda-ai/webmcp-kit",
   "repository": "https://github.com/nekuda-ai/webmcp-kit",
+  "license": "MIT",
   "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"]
 }
