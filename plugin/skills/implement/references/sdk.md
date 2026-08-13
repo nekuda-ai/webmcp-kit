@@ -1,12 +1,12 @@
-# @agentlane/webmcp v0.4.0 — exact API surface
+# @nekuda/webmcp-sdk v0.4.0 — exact API surface
 
 **Resolved name — the rule for every specifier.** Wire and import the SDK under the
 name the **installed package's own `package.json` declares**, never a name copied
 from these docs or inferred from a date. A workspace may vendor a source-exporting
 copy under a legacy alias such as `@nekuda/webmcp`, or install the built registry
-package as `@agentlane/webmcp`. Every dependency
+package as `@nekuda/webmcp-sdk`. Every dependency
 entry, generated import, import-map key and bundler config uses that one resolved
-name. Examples in these references spell it `@agentlane/webmcp`.
+name. Examples in these references spell it `@nekuda/webmcp-sdk`.
 
 ## Wiring
 - **Vendored source copy:** local dependency — npm/pnpm `file:<vendor-dir>`, yarn
@@ -14,7 +14,7 @@ name. Examples in these references spell it `@agentlane/webmcp`.
   source (`exports "."` → `src/index.ts`), so a Next.js consumer must add
   `transpilePackages: ["<resolved name>"]`; other bundlers need the equivalent
   transpile opt-in for a source-exporting dependency.
-- **Built registry package:** a normal `@agentlane/webmcp` dependency — ships a
+- **Built registry package:** a normal `@nekuda/webmcp-sdk` dependency — ships a
   prebuilt ESM bundle (`dist/index.js`) plus types, so no transpile step.
 - **No bundler (PHP/static MPA):** serve the package's `dist/index.js` and map the
   resolved name to it with `<script type="importmap">`.
@@ -22,7 +22,7 @@ name. Examples in these references spell it `@agentlane/webmcp`.
 ## API
 `defineTool<TInput>` requires `TInput extends Record<string, unknown>` — declare the input shape as a `type`, not an `interface` (interfaces have no implicit index signature and fail the constraint).
 ```ts
-import { defineTool, registerTools } from "@agentlane/webmcp";
+import { defineTool, registerTools } from "@nekuda/webmcp-sdk";
 
 const tool = defineTool({        // validates eagerly + freezes; NO side effects
   stableKey: "cart.add",         // REQUIRED durable id, dot-namespaced domain.action;

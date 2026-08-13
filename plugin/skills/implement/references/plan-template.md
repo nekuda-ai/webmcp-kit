@@ -29,7 +29,7 @@ Proposing N tools (category norm: X–Y)
 ## Changes
 new: <files> · modified: <files> · dependency: <resolved SDK name> from <source>
   — the installed package's declared name (`references/sdk.md`), e.g. `@nekuda/webmcp`
-  from `file:vendor/nekuda-webmcp`, or `@agentlane/webmcp` from npm once published
+  from `file:vendor/nekuda-webmcp`, or `@nekuda/webmcp-sdk` from npm
 ## After approval
 branch → code → verify (each tool ends verified / failed / could-not-verify) → PR
 

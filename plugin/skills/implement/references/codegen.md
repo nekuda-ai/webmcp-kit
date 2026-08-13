@@ -1,6 +1,6 @@
-# Codegen — `@agentlane/webmcp` v0.4.0 (contract v1)
+# Codegen — `@nekuda/webmcp-sdk` v0.4.0 (contract v1)
 
-Add the SDK dependency per `references/sdk.md` (registry once published, the workspace's vendored copy until then) and use the **resolved name** it defines — the installed package's own declared name — in every import and config below; the samples here spell it `@agentlane/webmcp`. Generated code imports **only** `defineTool` / `registerTools` — never the raw browser surface, never a bundled polyfill. The SDK owns surface detection (which global the browser exposes) and no-ops gracefully when unsupported, so generated code makes no browser-surface claims of its own. (The concrete surface names live only in `references/verify.md`.)
+Add the SDK dependency per `references/sdk.md` and use the **resolved name** it defines — the installed package's own declared name — in every import and config below; the samples here spell it `@nekuda/webmcp-sdk`. Generated code imports **only** `defineTool` / `registerTools` — never the raw browser surface, never a bundled polyfill. The SDK owns surface detection (which global the browser exposes) and no-ops gracefully when unsupported, so generated code makes no browser-surface claims of its own. (The concrete surface names live only in `references/verify.md`.)
 
 **No JS bundler / package manager** (a PHP or static MPA with no `package.json`): a bare `import { … } from "<resolved name>"` will not resolve in the browser. Deliver the SDK as a pinned local ESM asset the page can load — vendor its ESM build into the repo and reference it via an **import map** (`<script type="importmap">` mapping the resolved name to that file), or pre-bundle the entry module. Never inject a bare specifier a browser can't resolve, and never pull it from an untrusted CDN at runtime.
 
@@ -28,7 +28,7 @@ Connecting the site to the platform later (keys, telemetry) touches wrapper conf
 
 ```ts
 // <srcroot>/webmcp/tools/cart.ts  — generated tool module (no side effects)
-import { defineTool } from "@agentlane/webmcp";
+import { defineTool } from "@nekuda/webmcp-sdk";
 
 export const addToCart = defineTool({
   stableKey: "cart.add",
@@ -76,7 +76,7 @@ For a delete/cancel with no payment step, use a **prepare→confirm** pair: `pre
 ```tsx
 // <srcroot>/webmcp/WebmcpProvider.tsx
 import { useEffect } from "react";
-import { registerTools } from "@agentlane/webmcp";
+import { registerTools } from "@nekuda/webmcp-sdk";
 import { addToCart } from "./tools/cart";
 
 export function WebmcpProvider() {
@@ -93,7 +93,7 @@ export function WebmcpProvider() {
 // <srcroot>/webmcp/registrar.tsx
 "use client";
 import { useEffect } from "react";
-import { registerTools } from "@agentlane/webmcp";
+import { registerTools } from "@nekuda/webmcp-sdk";
 import { askSite } from "./tools/site";
 
 export function WebmcpRegistrar() {
@@ -108,7 +108,7 @@ export function WebmcpRegistrar() {
 **Server-templated MPA / static** — a module included via `<script type="module">` in the shared layout; register on load, unregister on `pagehide`:
 ```ts
 // <srcroot>/webmcp/entry.ts
-import { registerTools } from "@agentlane/webmcp";
+import { registerTools } from "@nekuda/webmcp-sdk";
 import { askSite } from "./tools/site";
 
 const reg = registerTools([askSite]);

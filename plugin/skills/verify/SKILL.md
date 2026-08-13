@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Check that a locally running site's WebMCP tools register and execute correctly. Use to verify WebMCP tools, confirm document.modelContext tools appear on the right pages and auth states, or test @agentlane/webmcp tools in a browser.
+description: Check that a locally running site's WebMCP tools register and execute correctly. Use to verify WebMCP tools, confirm document.modelContext tools appear on the right pages and auth states, or test @nekuda/webmcp-sdk tools in a browser.
 argument-hint: "[base URL of the running site]"
 ---
 

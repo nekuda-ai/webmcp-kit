@@ -12,7 +12,7 @@
       "name": "webmcp-kit",
       "source": "./plugin",
       "version": "0.2.0",
-      "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement against @agentlane/webmcp, and verify the tools in a browser.",
+      "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement against @nekuda/webmcp-sdk, and verify the tools in a browser.",
       "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
       "homepage": "https://github.com/nekuda-ai/webmcp-kit",
       "repository": "https://github.com/nekuda-ai/webmcp-kit",
