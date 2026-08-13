@@ -1,0 +1,1349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebMCP Kit Explorer</title>
+<!-- The state folder is untrusted input. CSP is the backstop behind the escaping in
+     the page script: no inline handlers, no eval, nothing loadable but pinned driver.js.
+     The two script hashes and the style hash cover this file's inline blocks —
+     regenerate them if you edit any inline style or script block. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; style-src 'sha256-HR1WWbdIaPRKTAQIbSTH8f2alR0/C7VVwuy+ryU8l+I=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-G3AVYphqD7mPApHc8Pb7LwuMhoe93XozMAL7ZZxY+T0=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css" integrity="sha384-XUGWln86d3kDvw/W1Qbii8QQyeWs2LcFYfGhYrmSZ0ZiXxowttKpfdhPdLE+WMFx" crossorigin="anonymous">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("webmcp-explorer-theme")||"light"}catch(e){}</script>
+<style>:root{--bg:#f6f7f6;--panel:#fff;--ink:#222624;--muted:#737975;--line:#dfe3e0;--blue:#279cff;--blue-bg:#eef8ff;--green:#41865f;--green-bg:#eef6f1;--gold:#987627;--gold-bg:#fbf6e8;--red:#b55545;--red-bg:#fff1ee;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+*{box-sizing:border-box}
+html, body{margin:0;min-width:1050px;min-height:760px;overflow:auto}
+button, textarea{font:inherit;color:inherit}
+.app{height:100vh;min-height:760px;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 26px;border-bottom:1px solid var(--line);background:#fafbfa}
+.brand{display:flex;align-items:center;gap:11px;font:700 12px var(--mono)}
+.logo{width:29px;height:29px;display:grid;place-items:center;border:1px solid;border-radius:8px}
+.dim{color:var(--muted)}
+.top-actions{display:flex;align-items:center;gap:8px}
+.chip{min-height:30px;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--muted);font-size:11px}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.workspace{min-height:0;display:grid;grid-template-columns:44% 56%;gap:12px;padding:12px 16px}
+.panel{min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 1px 2px #1c231e0a,0 8px 24px #1c231e09}
+.eyebrow{font:700 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#5f6661}
+.tree-panel{display:grid;grid-template-rows:minmax(0,1fr)}
+.controls{display:flex;align-items:center;gap:8px}
+.seg{display:flex;padding:3px;border:1px solid var(--line);border-radius:9px;background:#f4f5f4}
+.seg button{height:27px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:11px;cursor:pointer}
+.seg button.active{background:#fff;color:var(--ink);box-shadow:0 1px 2px #00000015}
+.check{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto;padding:0;border:1px solid #aeb6b0;border-radius:5px;background:#fff;color:#fff;font-size:10px;cursor:pointer}
+.check.on{border-color:var(--blue);background:var(--blue)}
+.check.mixed{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+.tree-scroll{min-height:0;overflow:auto;padding:20px}
+.map{min-height:100%;display:grid;grid-template-columns:minmax(137px,max-content) minmax(112px,max-content) minmax(225px,1fr);gap:20px;align-items:start}
+.node{position:relative;min-height:44px;display:flex;align-items:center;gap:8px;margin-top:9px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:600 11px var(--mono);white-space:nowrap}
+.page{border-color:#6ebcff;background:#fbfdff}
+.page-count{margin-left:auto;padding:4px 6px;border-radius:99px;background:#f0f2f1;color:var(--muted);font:10px var(--mono)}
+.tools{display:flex;flex-direction:column;gap:8px}
+.tool{position:relative;min-height:44px;display:flex;align-items:center;gap:9px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
+.tool:hover{border-color:#b7d9f6}
+.tool.active{border-color:#56afff;background:var(--blue-bg)}
+.tool.off{opacity:.55;background:#f8f8f8}
+.tool.off .tool-name{text-decoration:line-through}
+.tool-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px var(--mono)}
+.outline{display:none;flex-direction:column;gap:8px}
+.tree-scroll.outline-mode .map{display:none}
+.tree-scroll.outline-mode .outline{display:flex}
+.outline .tool{min-height:58px}
+.detail{display:grid;grid-template-rows:82px 44px minmax(0,1fr)}
+.detail-head{display:block;padding:15px 18px;border-bottom:1px solid var(--line)}
+.detail-head-top{display:flex;align-items:center;gap:8px}
+.detail-head-top .eyebrow{flex:1 1 auto;min-width:0}
+.title-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:7px}
+.title-row h1{flex:0 0 100%}/* the status pill breaks to its own line under the name */
+.title-row h1{margin:0;font:700 14px var(--mono)}
+.selection{min-height:30px;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid #cfe4d5;border-radius:7px;background:var(--green-bg);color:var(--green);font-size:11px;cursor:pointer}
+.selection.off{border-color:#efd4ce;background:var(--red-bg);color:var(--red)}
+.detail-body{position:relative;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 244px}
+.content{min-width:0;overflow:auto;padding:20px 22px 70px}
+.field{margin-bottom:23px}
+.label{display:flex;align-items:center;gap:7px;margin-bottom:8px;color:var(--muted);font:700 9px var(--mono);letter-spacing:.13em;text-transform:uppercase}
+.label:before{content:"≡";font-size:12px}
+.annotatable{white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.7;cursor:text}
+.annotatable:hover{background:linear-gradient(90deg,#279cff0a,transparent)}
+.schema{display:grid;grid-template-columns:minmax(95px,.7fr) 70px minmax(140px,1.5fr);overflow:hidden;border:1px solid var(--line);border-radius:9px;font-size:10px}
+.schema div{padding:8px 9px;border-bottom:1px solid var(--line)}
+.schema div:nth-last-child(-n+3){border-bottom:0}
+.schema .sh{background:#f6f7f6;color:var(--muted);font:700 8px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.codebox{overflow:hidden;border:1px solid #313733;border-radius:10px;background:#171b19}
+.codehead{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid #2d332f;color:#9ca69f;font:10px var(--mono)}
+pre.annotatable{min-height:420px;margin:0;padding:15px;overflow:auto;background:#171b19;color:#dfe8e2;font:10.5px/1.68 var(--mono);tab-size:2}
+pre.annotatable:hover{background:#171b19}
+.decision-card{margin-bottom:11px;padding:13px;border:1px solid var(--line);border-radius:10px;background:#fcfdfc}
+.whole{width:100%;resize:vertical;padding:9px;border:1px solid var(--line);border-radius:8px;background:#fff;outline:none;font-size:11px;line-height:1.45}
+.whole{min-height:74px}
+.whole:focus, .general:focus{border-color:var(--blue);box-shadow:0 0 0 3px #279cff15}
+.small{min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:10px;cursor:pointer}
+.small.primary{border-color:var(--blue);background:var(--blue);color:#fff}
+.review{display:grid;grid-template-columns:1fr;align-items:center;padding:13px 12px;border-top:1px solid var(--line);background:#fafbfa;box-shadow:0 -8px 28px #181f1b08}
+.review strong{display:block;font-size:12px}
+.submit{min-width:210px;min-height:47px;padding:0 17px;border:1px solid #1e83d9;border-radius:9px;background:var(--blue);color:#fff;font-weight:650;font-size:11px;cursor:pointer}
+.toast{position:fixed;z-index:80;left:50%;bottom:110px;transform:translate(-50%,15px);opacity:0;padding:8px 12px;border-radius:8px;background:#202522;color:#fff;pointer-events:none;transition:.18s;font-size:10px}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+/* v2: the map is the product; the inspector stays quiet until requested. */
+.workspace{grid-template-rows:34px minmax(0,1fr);grid-template-columns:minmax(690px,68%) minmax(330px,32%);gap:12px;padding:10px 16px 12px}
+.controls{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+.controls>.eyebrow{padding-left:6px}
+.seg{justify-self:center}
+.tree-scroll{padding:26px 28px}
+.map{position:relative;grid-template-columns:minmax(170px,max-content) minmax(146px,max-content) minmax(268px,300px);column-gap:86px;justify-content:center}
+.node{min-height:44px;margin-top:10px;padding:0 14px;border-radius:11px}
+.tool{min-height:44px}
+.tool .tool-name{flex:0 1 auto;min-width:0}
+.tool .check{width:15px;height:15px;margin-left:auto;border-radius:4px;border-color:#c9d1cb;font-size:9px}
+.tool .check.on{border-color:var(--blue);background:var(--blue)}
+.tool-status{width:7px;height:7px;flex:none;border-radius:50%;background:var(--green)}
+.tool.off{opacity:.72;background:#fff}
+.tool-ghost{margin-top:14px;justify-content:flex-start;border-style:dashed;background:transparent;color:var(--muted);cursor:pointer}
+.tool-ghost:hover{border-color:#9ccdf5;color:var(--blue);background:var(--blue-bg)}
+.ghost-plus{font-size:14px;line-height:1}
+.tool-ghost .tool-name{color:inherit}
+.outline-ghost{grid-template-columns:auto auto 1fr;margin-top:10px;border:1px dashed var(--line);border-radius:8px;color:var(--muted)}
+.outline-ghost:hover{border-color:#9ccdf5;color:var(--blue);background:var(--blue-bg)}
+.outline-ghost .outline-name{color:inherit}
+.tool.off .tool-name{text-decoration:none;color:#909692}
+.outline{max-width:760px;margin:0 auto}
+.outline .tool{grid-template-columns:9px minmax(0,1fr) 18px auto;min-height:58px}
+.detail{grid-template-rows:82px minmax(0,1fr)}
+.detail-body{display:block}
+.content{height:100%;padding:20px 20px 70px}
+.field{margin-bottom:20px}
+.meta-strip{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 22px}
+.meta-chip{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:#f8f9f8;color:#606762;font:9px var(--mono)}
+.disclosure{margin-bottom:9px;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+.disclosure>summary{min-height:46px;display:flex;align-items:center;gap:9px;padding:0 13px;list-style:none;cursor:pointer;font:650 10px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.disclosure>summary::-webkit-details-marker{display:none}
+.disclosure>summary:before{content:"›";font-size:18px;line-height:1;color:#8b928d;transition:transform .15s}
+.disclosure[open]>summary:before{transform:rotate(90deg)}
+.summary-count{margin-left:auto;min-width:21px;height:21px;display:grid;place-items:center;padding:0 6px;border-radius:99px;background:#eef1ef;color:#68706b;font:9px var(--mono)}
+.disclosure-body{padding:4px 13px 15px;border-top:1px solid var(--line)}
+.disclosure .field{margin:14px 0 0}
+.disclosure .decision-card{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:12px 0;background:transparent}
+.disclosure .decision-card:last-child{border-bottom:0}
+.disclosure pre.annotatable{min-height:360px}
+.feedback-copy{margin:9px 0 12px;color:var(--muted);font-size:10px;line-height:1.5}
+.whole{min-height:72px}
+.selection{padding:0 9px}
+.selection .check{display:none}
+/* v3: mirror the Demo Center's quiet canvas and fanned connection map. */
+.app{grid-template-rows:auto minmax(0,1fr) auto}
+.top{padding:0 17px}
+.logo{width:28px;height:28px}
+.workspace{grid-template-columns:minmax(0,1fr) minmax(360px,420px);grid-template-rows:minmax(0,1fr);gap:12px;padding:12px}
+.panel{border-radius:12px;box-shadow:0 1px 2px #1c231e0a,0 10px 30px #1c231e08}
+.tree-panel{grid-template-rows:48px minmax(0,1fr)}
+.panel-head{padding:0 14px 0 20px}
+.tree-scroll{padding:28px 34px}
+.map{position:relative;isolation:isolate;grid-template-columns:minmax(176px,max-content) minmax(145px,max-content) minmax(220px,255px);column-gap:90px;justify-content:center}
+.map>.node, .map>.tools{z-index:1}
+.node{min-height:44px;margin-top:10px;padding:0 14px;border-radius:10px;box-shadow:0 1px 2px #1c231e0a}
+.node:after, .tool:before, .page:before{display:none}
+.map-links{position:absolute;inset:0;z-index:0;overflow:visible;pointer-events:none}
+.map-links path{fill:none;stroke:#75c2ff;stroke-width:1.15;vector-effect:non-scaling-stroke}
+.tools{gap:8px}
+.tool{min-height:43px;padding:0 12px;border-radius:10px;grid-template-columns:9px minmax(0,1fr) 15px auto;box-shadow:0 1px 2px #1c231e08}
+.tool.active{border-color:#55b5ff;background:#edf8ff}
+.tool:not(.dupe):not(.tool-ghost):hover{border-color:#55b5ff;background:#edf8ff}
+.tool .check{width:15px;height:15px;border-radius:4px;font-size:9px}
+.tool .check.on{border-color:#78aa8b;background:#78aa8b}
+.tool-name{font-size:11px}
+.detail{grid-template-rows:72px minmax(0,1fr)}
+.detail-head{padding:13px 18px}
+.content{padding:18px 20px 54px}
+.field{margin-bottom:18px}
+.disclosure>summary{height:43px}
+.review{padding:10px 12px}
+.submit{height:44px;min-width:200px}
+.top-actions .chip:not(.status){display:none}
+@media(max-width:1220px){.workspace{grid-template-columns:minmax(0,1fr) 385px}
+.tree-scroll{padding:26px 20px}
+.map{grid-template-columns:minmax(150px,max-content) minmax(122px,max-content) minmax(205px,220px);column-gap:54px}
+}
+/* v4 polish */
+:root{--panel-soft:#fafbfa;--code:#f7f9fb;--code-head:#f1f4f6;--shadow:#1c231e0a;--review-h:140px;--detail-w:420px;color-scheme:light}
+:root[data-theme="dark"]{--bg:#121614;--panel:#191e1b;--panel-soft:#161b18;--ink:#e7ece8;--muted:#949d97;--line:#303833;--blue:#58b3ff;--blue-bg:#172a36;--green:#78bd91;--green-bg:#17271d;--gold:#d2ae56;--gold-bg:#2c2516;--red:#dc8577;--red-bg:#311e1b;--code:#111613;--code-head:#171d19;--shadow:#0005;color-scheme:dark}
+.app{grid-template-rows:auto minmax(0,1fr) var(--review-h)}
+.workspace{position:relative;grid-template-columns:minmax(0,1fr) var(--detail-w)}
+.top, .review{background:var(--panel-soft)}
+.panel, .tool, .node, .disclosure, .selection, .small, .chip{background:var(--panel)}
+.seg{background:var(--panel-soft)}
+.seg button.active{background:var(--panel)}
+.meta-chip, .schema .sh{background:var(--panel-soft);color:var(--muted)}
+.detail-resizer{position:absolute;z-index:18;top:12px;bottom:12px;right:calc(var(--detail-w) + 6px);width:12px;padding:0;border:0;background:transparent;cursor:col-resize;touch-action:none}
+.detail-resizer:after{content:"";position:absolute;top:10px;bottom:10px;left:5px;width:2px;border-radius:99px;background:transparent;transition:background .14s,box-shadow .14s}
+.detail-resizer:hover:after, .detail-resizer:focus-visible:after, .detail-resizer.dragging:after{background:var(--blue);box-shadow:0 0 0 3px #279cff20}
+.detail-resizer:focus-visible{outline:0}
+.workspace.no-selection{grid-template-columns:1fr!important}
+.workspace.no-selection .detail, .workspace.no-selection .detail-resizer{display:none}
+.detail-close{width:28px;height:28px;flex:none;margin-left:8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:16px;cursor:pointer}
+.detail-close:hover{background:var(--panel-soft);color:var(--ink)}
+.top-actions{position:relative}
+.top-button{height:30px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);font-size:11px;cursor:pointer}
+.top-button:hover{color:var(--ink);border-color:#9ba69f}
+.top-button svg{width:13px;height:13px}
+.tour-invite{position:absolute;z-index:45;top:38px;right:72px;width:242px;display:none;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 14px 38px #1118}
+.tour-invite.show{display:block}
+.tour-invite strong{display:block;font-size:12px}
+.tour-invite p{margin:5px 0 10px;color:var(--muted);font-size:10.5px;line-height:1.45}
+.tour-invite-actions{display:flex;justify-content:flex-end;gap:7px}
+.tree-panel{grid-template-rows:48px minmax(0,1fr)}
+.panel-head{display:flex;align-items:center;justify-content:space-between}
+.controls{display:block}
+.tree-scroll{padding-top:18px}
+.map{min-height:calc(100% - 41px)}
+.detail{grid-template-rows:auto minmax(0,1fr)}
+.detail-head{min-height:94px;padding:16px 18px}
+.title-row{margin-top:8px;align-items:flex-start;flex-wrap:wrap;row-gap:5px}
+.title-row h1{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.selection{flex:none}
+.detail-body, .content{width:100%;min-width:0}
+.content{padding:20px 18px 46px;overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable;overscroll-behavior:contain}
+.disclosure>summary{min-height:45px}
+.annotatable{cursor:default}
+.annotatable:hover{background:transparent}
+.codebox{width:100%;min-width:0;border-color:var(--line);background:var(--code)}
+.codehead{border-bottom-color:var(--line);background:var(--code-head);color:var(--muted)}
+pre.codeview{width:100%;min-width:0;min-height:360px;margin:0;padding:15px;overflow:auto;background:var(--code);color:#26312b;font:10.5px/1.68 var(--mono);tab-size:2}
+.tok-comment{color:#738078;font-style:italic}
+.tok-string{color:#a54b2a}
+.tok-keyword{color:#7557ad;font-weight:600}
+.tok-number{color:#147c74}
+:root[data-theme="dark"] pre.codeview{color:#dce7df}
+:root[data-theme="dark"] .tok-comment{color:#78867e}
+:root[data-theme="dark"] .tok-string{color:#dfa37d}
+:root[data-theme="dark"] .tok-keyword{color:#c2a6ff}
+:root[data-theme="dark"] .tok-number{color:#6ac9bd}
+.tool{grid-template-columns:9px minmax(0,1fr) 15px}
+.tool.off{opacity:.52;background:var(--panel)}
+.tool.off .tool-name{text-decoration:line-through;text-decoration-thickness:1px}
+.tool .check{margin-left:auto}
+.outline{max-width:820px}
+.outline-page{width:100%;min-height:42px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;text-align:left}
+.outline-page:hover, .outline-tool:hover{background:var(--panel-soft)}
+.outline-chevron{color:var(--muted);font-size:17px;transition:transform .18s}
+.outline-page.open .outline-chevron{transform:rotate(90deg)}
+.outline-route{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:650 13px var(--mono)}
+.outline-total{color:var(--muted);font-size:11.5px}
+.outline-children{display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease}
+.outline-children.open{grid-template-rows:1fr}
+.outline-clip{overflow:hidden}
+.outline-list{padding:2px 0 5px 20px}
+.outline-tool{width:100%;min-height:38px;display:grid;grid-template-columns:8px max-content minmax(0,1fr) 15px;align-items:center;gap:10px;padding:7px 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;text-align:left}
+.outline-tool.active{background:var(--blue-bg)}
+.outline-tool.off{opacity:.5}
+.outline-tool.off .outline-name{text-decoration:line-through}
+.outline-name{font:500 11.5px var(--mono);white-space:nowrap}
+.outline-summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px}
+.outline-tool .check{width:15px;height:15px}
+.tool .check{margin-left:auto}
+.outline-tool{position:relative;grid-template-columns:8px max-content minmax(0,1fr) 15px}
+.tool-feedback-status{color:var(--muted);font-size:9px}
+.tour-section{max-height:calc(100% - 18px);overflow:auto}
+.review{position:relative;align-items:stretch;min-height:0;overflow:hidden;padding:22px 12px 13px}
+.review-resizer{position:absolute;inset:0 0 auto;height:13px;border:0;background:transparent;cursor:row-resize;touch-action:none}
+.review-resizer:after{content:"";position:absolute;top:5px;left:50%;width:46px;height:3px;transform:translateX(-50%);border-radius:99px;background:#bbc3be}
+.review-resizer:hover:after, .review-resizer.dragging:after{background:var(--blue)}
+.submit{align-self:center}
+.toast{bottom:calc(var(--review-h) + 18px)}
+.driver-popover.webmcp-tour{--driver-popover-font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:300px;border:1px solid var(--line);border-radius:11px;background:var(--panel);color:var(--ink);box-shadow:0 18px 55px #0003}
+.webmcp-tour .driver-popover-title{font-size:14px}
+.webmcp-tour .driver-popover-description{color:var(--muted);font-size:11px;line-height:1.5}
+.webmcp-tour .driver-popover-footer-btn{border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);text-shadow:none}
+.webmcp-tour .driver-popover-next-btn{border-color:var(--blue);background:var(--blue);color:#fff}
+:root[data-theme="dark"] .driver-active-element{outline:3px solid var(--blue)!important;outline-offset:3px;box-shadow:0 0 0 7px #58b3ff38!important}
+:root[data-theme="dark"] .driver-popover.webmcp-tour{border-color:#58b3ff;background:#222a25;color:#f4f8f5;box-shadow:0 22px 70px #000a}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-title{color:#fff}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-description, :root[data-theme="dark"] .webmcp-tour .driver-popover-progress-text{color:#c3cec7}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-footer-btn{border-color:#4a5650;background:#19201c;color:#edf4ef}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-next-btn{border-color:#58b3ff;background:#58b3ff;color:#08131a}
+:root[data-theme="dark"] .top, :root[data-theme="dark"] .review, :root[data-theme="dark"] .panel-head{background:var(--panel-soft)}
+:root[data-theme="dark"] .panel, :root[data-theme="dark"] .tool, :root[data-theme="dark"] .node, :root[data-theme="dark"] .disclosure, :root[data-theme="dark"] .selection, :root[data-theme="dark"] .small, :root[data-theme="dark"] .chip, :root[data-theme="dark"] .general, :root[data-theme="dark"] textarea{background:var(--panel);color:var(--ink)}
+:root[data-theme="dark"] .tool.active{background:var(--blue-bg)}
+/* Iteration loop: review → agent works → the interactive plan changes in place. */
+.top-button[hidden]{display:none}
+.top-button.update-button{color:var(--blue);border-color:#b9daf5;background:var(--blue-bg)}
+.submit{position:relative}
+.submit:disabled{cursor:wait;opacity:.72}
+@keyframes spin{to{transform:rotate(360deg)}
+}
+.agent-stage{position:absolute;z-index:35;inset:12px;display:grid;place-items:center;padding:28px;border-radius:12px;background:#f4f7f5e8;backdrop-filter:blur(4px)}
+.agent-stage[hidden]{display:none}
+:root[data-theme="dark"] .agent-stage{background:#0d110fe8}
+.agent-card{width:min(820px,92%);max-height:calc(100% - 24px);display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 26px 80px #1115}
+.agent-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.agent-card-head h2{margin:6px 0 4px;font-size:18px;letter-spacing:-.02em}
+.agent-card-head p{margin:0;color:var(--muted);font-size:11.5px;line-height:1.5}
+.iteration-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #cfe4d5;border-radius:99px;background:var(--green-bg);color:var(--green);font:700 9px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.agent-close{width:30px;height:30px;display:grid;place-items:center;flex:none;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);cursor:pointer}
+.agent-close:hover{color:var(--ink)}
+.agent-card-body{min-height:0;overflow:auto;padding:20px}
+.agent-processing{display:grid;place-items:center;min-height:360px;text-align:center}
+.agent-processing[hidden]{display:none}
+.agent-spinner{width:42px;height:42px;margin:0 auto 16px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .85s linear infinite}
+.agent-processing h3{margin:0 0 7px;font-size:16px}
+.agent-processing p{margin:0;color:var(--muted);font-size:11.5px}
+.processing-steps{display:flex;justify-content:center;gap:8px;margin-top:20px}
+.processing-step{padding:5px 8px;border-radius:99px;background:var(--panel-soft);color:var(--muted);font:9px var(--mono)}
+.processing-step.active{background:var(--blue-bg);color:var(--blue)}
+/* Live lens over the state folder: connection, status lifecycle, change flash, conversation. */
+.tool-status{background:var(--muted)}
+.tool-status.st-building{background:var(--gold);animation:beat 1.1s ease-in-out infinite}
+.tool-status.st-review{background:var(--blue)}
+.tool-status.st-approved{background:var(--green)}
+@keyframes beat{50%{opacity:.28}
+}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:99px;background:var(--panel-soft);color:var(--muted);font:700 9px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.status-pill i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.status-pill.st-building{background:var(--gold-bg);color:var(--gold)}
+.status-pill.st-review{background:var(--blue-bg);color:var(--blue)}
+.status-pill.st-approved{background:var(--green-bg);color:var(--green)}
+.step-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.step-chip{padding:4px 8px;border-radius:99px;background:var(--panel-soft);color:var(--muted);font:9px var(--mono)}
+.step-chip.step-start{background:var(--gold-bg);color:var(--gold)}
+.step-chip.step-done{background:var(--green-bg);color:var(--green)}
+/* Ephemeral change highlight — what moved between the last two updates. Never stored. */
+@keyframes flashmark{0%{box-shadow:0 0 0 2px var(--blue),0 0 0 6px #279cff26}
+70%{box-shadow:0 0 0 2px var(--blue),0 0 0 6px #279cff26}
+100%{box-shadow:0 0 0 0 #279cff00,0 0 0 0 #279cff00}
+}
+.flash{animation:flashmark 2.4s ease-out}
+.flash-tag{margin-left:auto;padding:2px 6px;border-radius:99px;background:var(--blue-bg);color:var(--blue);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase;animation:fadeout 2.4s ease-out forwards}
+@keyframes fadeout{75%{opacity:1}
+100%{opacity:0}
+/* Conversation with the agent lives beside the composer that produces it. */
+}
+
+.conversation{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:6px}
+.conversation .conv-label{color:var(--muted);font:700 9px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.chat{min-height:0;overflow:auto;padding:2px 0 0;display:grid;gap:5px;align-content:start}
+.msg{padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-size:11px;line-height:1.45;white-space:pre-wrap}
+.msg .who{display:block;color:var(--muted);font:700 8px var(--mono);letter-spacing:.07em;text-transform:uppercase}
+.msg.claude{background:var(--blue-bg);border-color:#cfe2f5}
+:root[data-theme="dark"] .msg{background:var(--panel)}
+:root[data-theme="dark"] .msg.claude{background:#152230;border-color:#20374d}
+.chat .chat-empty{color:var(--muted);font-size:10.5px}
+.review-actions{display:flex;align-items:center;justify-content:flex-end;min-width:0}
+/* Until a conversation exists the footer is just the Submit row. */
+.review.collapsed{display:none}
+.app.no-chat{grid-template-rows:minmax(96px,auto) minmax(0,1fr) 0!important}
+.status-bar{display:flex;align-items:center;gap:14px;min-height:46px;padding:6px 8px 6px 14px;border-top:1px solid var(--line);background:var(--panel-soft);color:var(--ink);font-size:11px;line-height:1.5}
+.status-bar .submit{flex:none;min-width:0;align-self:stretch;min-height:0;padding:0 14px}
+.status-bar>span{flex:1 1 auto;min-width:0}
+.status-note{display:inline-flex;align-items:center;gap:6px;flex:none;align-self:stretch;padding:0 14px}
+.status-note svg{width:19px;height:19px}
+.status-note.has-content{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue)}
+.tree-panel{position:relative}
+.side-rail{position:absolute;top:64px;right:12px;z-index:24;display:flex;flex-direction:column;gap:8px}
+.rail-button{width:62px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px 7px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font-size:9px;cursor:pointer}
+.rail-button svg{width:16px;height:16px}
+.rail-button:hover:not(:disabled), .rail-button.has-content{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue)}
+.rail-button:disabled{opacity:.45;cursor:not-allowed}
+.rail-flyout{width:340px;max-width:86vw;margin:auto;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:0 24px 64px #1119}
+.rail-flyout::backdrop{background:#1c231e59;backdrop-filter:blur(1.5px)}
+.rail-flyout header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.rail-flyout strong{font:650 11px var(--mono)}
+.rail-flyout-close{width:25px;height:25px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.rail-flyout-close:hover{background:var(--panel-soft);color:var(--ink)}
+.rail-flyout textarea{width:100%;min-height:84px;resize:vertical;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-size:11px;line-height:1.45;outline:none}
+.rail-flyout textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #279cff15}
+.rail-flyout footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}
+.rail-count{color:var(--muted);font:10px var(--mono)}
+.note-actions{display:flex;align-items:center;gap:8px;margin-top:9px}
+.note-actions .spacer{flex:1}
+/* Build progress replaces the mockup's simulated diff stage — same frame, real data. */
+.build-list{display:grid;gap:9px;margin-top:18px;text-align:left}
+.build-row{padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.build-row strong{display:block;font:650 11.5px var(--mono)}
+.empty-state{padding:26px 20px;color:var(--muted);font-size:11.5px;line-height:1.6;text-align:center}
+/* Several mockup rules set an explicit display, which beats the hidden attribute. */
+[hidden]{display:none!important}
+
+/* Round-2 additions: unknown-value fallbacks, the state-folder overflow panel. */
+.dot-live{color:var(--green)}
+.extras{max-width:756px;margin:12px auto 0}
+.extra-file{margin-top:8px}
+.extra-file b{font:650 10px var(--mono)}
+.extra-file pre{max-height:180px;margin:6px 0 0;padding:9px;overflow:auto;border-radius:8px;background:var(--panel-soft);font:9.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
+.chat-earlier{justify-self:start;margin-bottom:2px}
+.msg.typing .dots{display:inline-flex;gap:4px;align-items:center;height:12px}
+.msg.typing .dots i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.25;animation:typing 1.2s infinite}
+.msg.typing .dots i:nth-child(2){animation-delay:.2s}
+.msg.typing .dots i:nth-child(3){animation-delay:.4s}
+@keyframes typing{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.step-chip.step-failed{background:var(--red-bg);color:var(--red)}
+.step-chip.step-warn{background:var(--gold-bg);color:var(--gold)}
+.tool-status.st-declined{background:var(--red);opacity:.5}
+.status-pill.st-declined{background:var(--red-bg);color:var(--red)}
+.node.page{max-width:230px;overflow:hidden}
+#journeyLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-warning{margin-bottom:8px;padding:9px 11px;border:1px solid #ead4cf;border-radius:9px;background:var(--red-bg);color:var(--red);font-size:10.5px;line-height:1.5}
+.tool.dupe,.outline-tool.dupe{opacity:.6;cursor:default}
+.dupe-badge{margin-left:auto;padding:3px 7px;border-radius:99px;background:var(--red-bg);color:var(--red);font:700 8px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+.extra-file button{margin-top:6px}
+/* NEK-711: readable laptop scale and a review-first first-run hierarchy. */
+:root{--review-h:286px}
+body{font-size:18px}
+.app{grid-template-rows:minmax(96px,auto) minmax(0,1fr) var(--review-h)}
+.top{display:grid;grid-template-columns:minmax(260px,auto) minmax(390px,1fr) auto;gap:20px;padding:10px 18px}
+.brand-stack{min-width:0;display:grid;gap:5px}
+.brand{font-size:18px}
+.logo{width:40px;height:40px;font-size:18px}
+.role-copy{color:var(--muted);font-size:15px;line-height:1.35}
+.phase-steps{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0}
+.phase-step{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid transparent;border-radius:8px;color:var(--muted);font:650 16px var(--mono);white-space:nowrap}
+.phase-step:before{content:"";width:8px;height:8px;flex:none;border:2px solid currentColor;border-radius:50%}
+.phase-step.complete{color:var(--green)}
+.phase-step.complete:before{background:currentColor}
+.phase-step.current{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue);box-shadow:0 0 0 2px #279cff14}
+.phase-step.current:before{background:currentColor;box-shadow:0 0 0 3px #279cff20}
+.chip,.top-button{min-height:40px;font-size:16px}
+.top-actions{gap:9px}
+.top-button:disabled{cursor:not-allowed;opacity:.45}
+.eyebrow,.label,.schema .sh,.conversation .conv-label,.msg .who{font-size:15px}
+.seg button,.node,.tool-name,.outline-name,.outline-summary,.outline-total,.selection,.annotatable,.schema,.whole,.small,.status-bar,.rail-flyout textarea,.submit,.toast,.tour-invite p,.feedback-copy,.msg,.chat .chat-empty,.empty-state,.plan-warning,.agent-card-head p,.agent-processing p{font-size:18px}
+.page-count,.meta-chip,.disclosure>summary,.summary-count,.codehead,.status-pill,.step-chip,.tool-feedback-status,.iteration-chip,.processing-step,.flash-tag,.dupe-badge,.extra-file b,.extra-file pre{font-size:16px}
+.title-row h1{font-size:24px}
+.tour-invite strong,.rail-flyout strong,.build-row strong{font-size:20px}
+.rail-button{width:80px;font-size:12px}
+.rail-button svg{width:20px;height:20px}
+.rail-flyout{width:400px}
+.rail-count{font-size:13px}
+.outline-route{font-size:20px}
+pre.annotatable,pre.codeview{font-size:17px;line-height:1.6}
+.webmcp-tour .driver-popover-title{font-size:20px}
+.webmcp-tour .driver-popover-description,.webmcp-tour .driver-popover-progress-text{font-size:18px}
+.webmcp-tour .driver-popover-footer-btn{font-size:16px}
+.check{width:22px;height:22px;font-size:15px}
+.tool .check,.outline-tool .check{width:21px;height:21px;font-size:14px}
+.panel-head,.tree-panel{min-height:58px}
+.tree-panel{grid-template-rows:minmax(58px,auto) minmax(0,1fr)}
+.node{min-height:58px}
+.tool{min-height:58px}
+.outline-page{min-height:52px}
+.outline-tool{min-height:50px}
+.selection,.small{min-height:40px}
+.disclosure>summary{min-height:56px}
+.whole{min-height:94px}
+.review{align-items:stretch;padding:26px 12px 15px}
+.conversation{grid-template-rows:auto minmax(0,1fr);gap:8px}
+.chat{gap:8px}
+.msg{padding:9px 11px}
+.submit{min-width:200px;height:54px}
+.tour-invite{width:330px;padding:17px}
+.processing-steps{flex-wrap:wrap}
+.processing-step{padding:7px 10px}
+@media(max-width:1250px){.top{grid-template-columns:auto minmax(360px,1fr) auto;gap:12px}.brand .dim{display:none}.role-copy{max-width:230px}.phase-step{padding:6px;font-size:14px}.map{grid-template-columns:minmax(160px,max-content) minmax(135px,max-content) minmax(240px,1fr);column-gap:32px;max-width:670px}}
+</style>
+</head>
+
+<body>
+<main class="app">
+  <header class="top">
+    <div class="brand-stack"><div class="brand"><span class="logo">W</span><span>WebMCP Kit Explorer</span><span class="dim">/ Interactive plan</span></div><span class="role-copy">The terminal builds. Review and steer the tools here.</span></div>
+    <nav class="phase-steps" id="phaseSteps" aria-label="Current phase"><span class="phase-step" data-phase-step="propose">Plan</span><span class="phase-step" data-phase-step="build">Build</span><span class="phase-step" data-phase-step="review">Review</span><span class="phase-step" data-phase-step="verify">Verify</span><span class="phase-step" data-phase-step="done">Done</span></nav>
+    <div class="top-actions"><button class="top-button update-button" id="stageButton" hidden>◈&nbsp; Build progress</button><button class="top-button" id="tourButton" aria-label="Start quick tour">?&nbsp; Tour</button><button class="top-button" id="themeButton" aria-label="Switch color theme">◐&nbsp; <span id="themeLabel">Dark</span></button><aside class="tour-invite" id="tourInvite"><strong>New here?</strong><p>See how to review the interactive plan, steer the agent, and approve the tools it builds.</p><div class="tour-invite-actions"><button class="small" id="dismissTour">Not now</button><button class="small primary" id="startTour">Start tour</button></div></aside></div>
+  </header>
+  <section class="workspace">
+    <section class="panel tree-panel">
+      <header class="panel-head">
+        <span class="eyebrow">Tool suggestions</span>
+        <div class="controls">
+          <div class="seg"><button class="active" data-view="map">⌘ Map</button><button data-view="outline">☷ Outline</button></div>
+        </div>
+      </header>
+      <div class="tree-scroll" id="treeScroll">
+        <div class="map"><svg class="map-links" id="mapLinks" aria-hidden="true"></svg><div class="node root"><i class="dot dot-live"></i>Interactive plan</div><div class="node page" id="journeyNode"><span id="journeyLabel">…</span><span class="page-count" id="pageCount">0</span></div><div class="tools" id="tools"></div></div>
+        <div class="outline" id="outline"></div>
+        <div class="extras" id="extras"></div>
+      </div>
+      <div class="side-rail" hidden><button class="rail-button" id="railRequest" type="button" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 14 5v6L8 14.2 2 11V5z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/><path d="M2 5l6 3.2L14 5M8 8.2v6" fill="none" stroke="currentColor" stroke-width="1.15"/></svg><span>Request tool</span></button></div>
+      <div class="status-bar"><span id="statusBox" role="status" aria-live="polite">Waiting for the agent to write the plan…</span><button class="small status-note" id="railNote" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.25h11v7.5H7l-3.25 2v-2H2.5z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/><path d="M5 6h6M5 8h4" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg><span>Add note</span></button><button class="submit" id="primaryAction">Submit interactive plan</button></div>
+      <dialog class="rail-flyout" id="railFlyout"><header><strong id="railFlyoutTitle">Add note</strong><button class="rail-flyout-close" id="railFlyoutClose" aria-label="Close">×</button></header><textarea id="railFlyoutInput" maxlength="500"></textarea><footer><span class="rail-count" id="railFlyoutCount">0/500</span><button class="small primary" id="railFlyoutAction" type="button">Save</button></footer></dialog>
+    </section>
+    <button class="detail-resizer" id="detailResizer" role="separator" aria-orientation="vertical" aria-label="Resize the suggestion panel" tabindex="0"></button>
+    <section class="panel detail">
+      <header class="detail-head">
+        <div class="detail-head-top"><span class="eyebrow">Selected suggestion</span><button class="selection" id="selection"></button><button class="detail-close" id="detailClose" aria-label="Close details">×</button></div>
+        <div class="title-row"><h1 id="title"></h1><span class="status-pill" id="statusPill"><i></i><span id="statusPillText"></span></span><span class="flash-tag" id="changeTag" hidden>updated</span></div>
+      </header>
+      <div class="detail-body">
+        <div class="content" id="content"></div>
+      </div>
+    </section>
+    <section class="agent-stage" id="agentStage" hidden aria-live="polite">
+      <article class="agent-card">
+        <header class="agent-card-head"><div><span class="iteration-chip" id="stageChip">Coding agent</span><h2 id="agentStageTitle">Building your tools</h2><p id="agentStageSubtitle">The agent is turning the interactive plan into tool modules.</p></div><button class="agent-close" id="closeAgentStage" aria-label="Close progress">×</button></header>
+        <div class="agent-card-body">
+          <section class="agent-processing"><div><div class="agent-spinner"></div><h3 id="processingTitle">Working…</h3><p id="processingCopy">This page follows the agent live — nothing to refresh.</p><div class="processing-steps"><span class="processing-step" data-process-step="propose">Interactive plan</span><span class="processing-step" data-process-step="build">Building tools</span><span class="processing-step" data-process-step="review">Ready for review</span><span class="processing-step" data-process-step="verify">Verifying</span><span class="processing-step" data-process-step="done">Done</span></div><div class="build-list" id="buildList"></div></div></section>
+        </div>
+      </article>
+    </section>
+  </section>
+  <footer class="review">
+    <button class="review-resizer" id="reviewResizer" aria-label="Resize the review area"></button>
+    <div class="conversation"><span class="conv-label">Conversation</span><div class="chat" id="chat"></div></div>
+  </footer>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js" integrity="sha384-ZD4UAn12lO2plEJ4lonOHO0fRSCgq0VAuoDx6/rglijDjzDYIXgCexIVu3PFJpJf" crossorigin="anonymous"></script>
+<script>
+(function(){
+"use strict";
+
+/* ── Untrusted input ──────────────────────────────────────────────────────────
+   Everything in the state folder is attacker-influenceable: a page the agent
+   browses can plant text that lands in plan.json or a chat reply. So:
+   - every value reaches the DOM through html`` (auto-escapes) or textContent;
+   - recognized enum values map to FIXED class names, unknown ones get a fixed
+     fallback class and are shown as escaped text;
+   - the only raw-HTML producer is codeHtml(), which escapes each slice itself.
+   Html instances are the sole raw marker, and JSON.parse cannot forge one. */
+function Html(h){this.h=h}
+var ESCAPES={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};
+function safeStr(v){
+  if(typeof v==="string")return v;
+  if(v==null)return"";
+  if(typeof v==="number"||typeof v==="boolean")return String(v);
+  try{var s=String(v);return typeof s==="string"?s:""}catch(e){return""}
+}
+function esc(v){return safeStr(v).replace(/[&<>"']/g,function(c){return ESCAPES[c]})}
+function frag(v){
+  if(v==null||v===false||v===true)return"";
+  if(v instanceof Html)return v.h;
+  if(Array.isArray(v)){for(var i=0,out="";i<v.length;i++)out+=frag(v[i]);return out}
+  return esc(v);
+}
+function html(parts){
+  var out=parts[0];
+  for(var i=1;i<arguments.length;i++)out+=frag(arguments[i])+parts[i];
+  return new Html(out);
+}
+function setHtml(node,value){node.innerHTML=frag(value)}
+function jsonish(v){try{return safeStr(JSON.stringify(v))}catch(e){return""}}
+
+/* Recognized values → fixed class names. Anything else gets a fixed fallback. */
+var STATUS_CLASS={proposed:"st-proposed",building:"st-building",review:"st-review",approved:"st-approved",declined:"st-declined"};
+var STEP_CLASS={start:"step-start",done:"step-done"};
+var OUTCOME_CLASS={verified:"step-done",failed:"step-failed","could-not-verify":"step-warn"};
+var OUTCOME_GLYPH={verified:"✓",failed:"✗","could-not-verify":"!"};
+var KNOWN_STATUS={proposed:1,building:1,review:1,approved:1,declined:1};
+function statusClass(v){return Object.prototype.hasOwnProperty.call(STATUS_CLASS,v)?STATUS_CLASS[v]:"st-unknown"}
+function stepClass(v){return Object.prototype.hasOwnProperty.call(STEP_CLASS,v)?STEP_CLASS[v]:"step-unknown"}
+function outcomeClass(v){return Object.prototype.hasOwnProperty.call(OUTCOME_CLASS,v)?OUTCOME_CLASS[v]:"step-unknown"}
+function outcomeGlyph(v){return Object.prototype.hasOwnProperty.call(OUTCOME_GLYPH,v)?OUTCOME_GLYPH[v]:""}
+function known(v){return Object.prototype.hasOwnProperty.call(KNOWN_STATUS,v)}
+
+/* ── Live wire ────────────────────────────────────────────────────────────────
+   The server serves this page and binds port 0, so the socket is always derived
+   from location.host. A connection starts with the whole state folder; later file
+   messages merge into that model. The page keeps no durable state of its own. */
+var files={},socket=null,finished=false,pending=null,queued=false;
+var model=null;
+
+function fileSet(source){
+  var out=Object.create(null);
+  if(!source||typeof source!=="object"||Array.isArray(source))return out;
+  Object.keys(source).forEach(function(name){if(typeof source[name]==="string")out[name]=source[name]});
+  return out;
+}
+function queueFiles(next){
+  pending=next;
+  if(queued)return;
+  queued=true;
+  // setTimeout, not requestAnimationFrame: rAF is suspended while the window is
+  // hidden or occluded (macOS occlusion counts), which left updates queued until
+  // the user looked at the window. 16ms still coalesces write bursts.
+  setTimeout(function(){queued=false;files=pending;pending=null;onFiles()},16);
+}
+
+function connect(){
+  if(finished)return;
+  var proto=location.protocol==="https:"?"wss://":"ws://";
+  try{socket=new WebSocket(proto+location.host+"/ws?role=page")}catch(e){return}
+  socket.onopen=function(){ui.connDown=false;ui.picks.clear();if(model)renderReview()};
+  socket.onmessage=function(e){
+    var msg;try{msg=JSON.parse(e.data)}catch(err){return}
+    if(!msg)return;
+    if(msg.type==="error"){toast(safeStr(msg.message)||"The server rejected that message");return}
+    if(msg.type==="snapshot"){queueFiles(fileSet(msg.files));return}
+    if(msg.type!=="file"||typeof msg.name!=="string"||(msg.text!==null&&typeof msg.text!=="string"))return;
+    // Rebuild storms (an agent writing several files at once) collapse to the latest.
+    var next=fileSet(pending||files);
+    if(msg.text===null)delete next[msg.name];else next[msg.name]=msg.text;
+    queueFiles(next);
+  };
+  socket.onclose=function(){
+    // Nothing we sent optimistically can still be in flight once the socket is gone.
+    if(ui.picks.size){ui.picks.clear();if(model)render()}
+    // Done ends the run: the server flushes the final file update and exits. Do not
+    // reconnect forever against a server that is meant to be gone.
+    if(finished||(model&&model.phase==="done")){finished=true;return}
+    ui.connDown=true;if(model)renderReview();
+    setTimeout(connect,1000);
+  };
+  socket.onerror=function(){try{socket.close()}catch(e){}};
+}
+function send(event){
+  if(!socket||socket.readyState!==1){toast("Not connected — nothing was sent");return false}
+  try{socket.send(JSON.stringify(event));return true}catch(e){toast("Could not reach the agent");return false}
+}
+
+/* ── Ephemeral UI state ───────────────────────────────────────────────────────
+   Maps, not objects: suggestion ids come off disk and "__proto__" must be a key
+   like any other. Nothing here survives a reload except the tour flag and theme. */
+var ui={activeId:null,picks:new Map(),notes:new Map(),open:new Map(),expandedFiles:new Set(),general:"",toolRequest:"",railMode:null,connDown:false,submitted:false,chatLocal:[],awaitingReply:false,claudeSeen:0,chatCount:0,
+        view:"map",outlineOpen:true,chatExpanded:false,stageClosed:false,
+        reviewHeight:286,inspectorWidth:420};
+var flashUntil=new Map(),flashTimer=null,prevSig=null,prevPhase=null;
+
+function $(s){return document.querySelector(s)}
+function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
+
+/* ── One normalization pass per update ────────────────────────────────────────
+   Every render helper reads this model; nothing re-parses the state folder. */
+var KNOWN_FIELDS={id:1,name:1,description:1,why:1,status:1,params:1};
+var CHAT_WINDOW=100,PREVIEW=2000;
+
+function ndjson(name){
+  var lines=safeStr(files[name]).split("\n"),out=[];
+  for(var i=0;i<lines.length;i++){
+    if(!lines[i])continue;
+    try{var v=JSON.parse(lines[i]);if(v&&typeof v==="object"&&!Array.isArray(v))out.push(v)}catch(e){}
+  }
+  return out;
+}
+function pairs(obj,skip){
+  var out=[];
+  Object.keys(obj).forEach(function(k){
+    if(skip&&Object.prototype.hasOwnProperty.call(skip,k))return;
+    var v=obj[k];
+    var text=(v&&typeof v==="object")?jsonish(v):safeStr(v);
+    if(text!=="")out.push({key:k,value:text});
+  });
+  return out;
+}
+function normalize(){
+  var plan={};
+  try{var p=JSON.parse(files["plan.json"]);if(p&&typeof p==="object"&&!Array.isArray(p))plan=p}catch(e){}
+
+  var raw=Array.isArray(plan.suggestions)?plan.suggestions:[];
+  var suggestions=[],byId=new Map();
+  raw.forEach(function(s,i){
+    if(!s||typeof s!=="object"||Array.isArray(s))return;
+    var id=safeStr(s.id)||safeStr(s.name)||"suggestion-"+(i+1);
+    var duplicate=byId.has(id); // never invent an id the agent cannot associate
+    var status=safeStr(s.status)||"proposed";
+    var entry={
+      id:id,name:safeStr(s.name)||id,description:safeStr(s.description),why:safeStr(s.why),
+      status:status,statusKnown:known(status),
+      params:(Array.isArray(s.params)?s.params:[]).filter(function(x){return x&&typeof x==="object"&&!Array.isArray(x)})
+        .map(function(x){return{name:safeStr(x.name),type:safeStr(x.type),description:safeStr(x.description)}}),
+      extras:pairs(s,KNOWN_FIELDS),duplicate:duplicate
+    };
+    suggestions.push(entry);
+    if(!duplicate)byId.set(id,entry);
+  });
+  // Only canonical entries are actionable: counts, picks and submit ignore duplicates.
+  var canonical=suggestions.filter(function(s){return !s.duplicate});
+
+  // Status: phases and per-suggestion build steps live in the same file.
+  var phase="",steps=new Map();
+  ndjson("_status.ndjson").forEach(function(e){
+    var ph=safeStr(e.phase);
+    if(ph){phase=ph;return}
+    var id=safeStr(e.suggestion),step=safeStr(e.step);
+    if(!id||!step)return;
+    if(!steps.has(id))steps.set(id,new Map());
+    steps.get(id).set(step,{state:safeStr(e.state)||"start",outcome:safeStr(e.outcome)});
+  });
+  if(!phase)phase=suggestions.length?"propose":"boot";
+
+  // Conversation: the agent's replies plus our own events echoed back by the server.
+  var chat=[];
+  ndjson("_feedback.ndjson").forEach(function(e){
+    if(e.type!=="comment"&&e.type!=="feedback")return;
+    var text=safeStr(e.text);
+    if(text)chat.push({ts:safeStr(e.ts),who:"you",re:safeStr(e.suggestion),text:text});
+  });
+  ndjson("_chat.ndjson").forEach(function(e){
+    var text=safeStr(e.text);
+    if(text)chat.push({ts:safeStr(e.ts),who:"claude",re:safeStr(e.re),text:text});
+  });
+  chat.sort(function(a,b){return a.ts<b.ts?-1:a.ts>b.ts?1:0});
+
+  // Picks are the server's record; the page only overlays what it just sent.
+  var recorded=new Map();
+  ndjson("_feedback.ndjson").forEach(function(e){
+    if(e.type!=="pick")return;
+    var id=safeStr(e.suggestion);
+    if(id)recorded.set(id,e.picked!==false);
+  });
+
+  // Code lives at <id>.code.md — one canonical name, no fallback.
+  var code=new Map(),claimed={};
+  suggestions.forEach(function(s){
+    var name=s.id+".code.md";
+    claimed[name]=1;
+    var text=safeStr(files[name]);
+    if(!text.trim())return;
+    var fence=text.match(/```([\w.+-]*)[^\S\n]*\r?\n([\s\S]*?)```/);
+    code.set(s.id,{file:name,lang:(fence&&fence[1])||"code",text:(fence?fence[2]:text).replace(/\s+$/,"")});
+  });
+
+  // Anything else the agent left in the folder is shown, not hidden.
+  var owned={"plan.json":1,"_status.ndjson":1,"_chat.ndjson":1,"_feedback.ndjson":1};
+  var extraFiles=Object.keys(files).filter(function(n){
+    return !Object.prototype.hasOwnProperty.call(owned,n)&&!Object.prototype.hasOwnProperty.call(claimed,n);
+  }).sort().map(function(n){return{name:n,text:safeStr(files[n])}});
+
+  return{journey:safeStr(plan.journey),site:safeStr(plan.site),suggestions:suggestions,canonical:canonical,byId:byId,phase:phase,steps:steps,
+         chat:chat,recorded:recorded,code:code,extraFiles:extraFiles,
+         planExtras:pairs(plan,{journey:1,site:1,suggestions:1})};
+}
+
+/* ── Ephemeral change highlight (replaces the mockup's version/diff subsystem) ──
+   Flash whatever moved between two consecutive updates, then forget it. Only
+   suggestions count: a comment echoing back is not a change to the plan. */
+function signature(){
+  var sig=new Map();
+  model.canonical.forEach(function(s){
+    var c=model.code.get(s.id);
+    sig.set(s.id,jsonish([s.name,s.description,s.why,s.status,s.params,s.extras,c&&c.text]));
+  });
+  return sig;
+}
+function markChanges(){
+  var next=signature();
+  if(prevSig){
+    var until=Date.now()+2400;
+    next.forEach(function(v,id){if(prevSig.get(id)!==v)flashUntil.set(id,until)});
+  }
+  prevSig=next;
+  clearTimeout(flashTimer);
+  if(flashUntil.size)flashTimer=setTimeout(function(){flashUntil.clear();render()},2500);
+}
+function flashing(id){var u=flashUntil.get(id);return u!==undefined&&u>Date.now()}
+
+/* ── Picks ────────────────────────────────────────────────────────────────────
+   _feedback.ndjson is the record. An optimistic overlay is installed only when
+   the send actually left the socket, and is dropped as soon as the record agrees
+   or the write clearly never landed — a failed pick must never stick. */
+function syncPicks(){
+  var now=Date.now();
+  ui.picks.forEach(function(o,id){
+    if(model.recorded.get(id)===o.on||now-o.at>2000)ui.picks.delete(id);
+  });
+}
+function picked(id){
+  var o=ui.picks.get(id);
+  if(o)return o.on;
+  if(model.recorded.has(id))return model.recorded.get(id);
+  var s=model.byId.get(id); // no pick on record: a declined suggestion reads as unpicked
+  return !(s&&s.status==="declined");
+}
+function pickedIds(){return model.canonical.filter(function(s){return picked(s.id)}).map(function(s){return s.id})}
+var pickTimer=null;
+/* A pick the server never records must not linger: expiry runs on its own clock,
+   not only when some later file update happens to arrive. */
+function schedulePickExpiry(){
+  clearTimeout(pickTimer);
+  if(!ui.picks.size)return;
+  pickTimer=setTimeout(function(){
+    var now=Date.now(),changed=false;
+    ui.picks.forEach(function(o,id){if(now-o.at>=2000){ui.picks.delete(id);changed=true}});
+    if(changed)render();
+    schedulePickExpiry();
+  },2100);
+}
+function setPick(id,on){
+  if(!send({type:"pick",suggestion:id,picked:on}))return;
+  ui.picks.set(id,{on:on,at:Date.now()});
+  schedulePickExpiry();
+  render();
+}
+function active(){
+  // No fallback to the first suggestion: the page opens with nothing selected
+  // and the map at full width; details appear when a tool is clicked.
+  return ui.activeId?model.byId.get(ui.activeId)||null:null;
+}
+function note(id){return safeStr(ui.notes.get(id))}
+function logLocal(re,text){ui.chatLocal.push({ts:new Date().toISOString().slice(0,19)+"Z",who:"you",re:re,text:text});renderChat()}
+function claudeCount(){return model?model.chat.filter(function(m){return m.who==="claude"}).length:0}
+function expectReply(){ui.awaitingReply=true;ui.claudeSeen=claudeCount();renderChat()}
+
+/* ── Rendering ───────────────────────────────────────────────────────────────── */
+function checkBox(s){
+  var on=picked(s.id);
+  return html`<button class="check ${on?"on":""}" data-toggle="${s.id}" aria-label="${(on?"Unpick ":"Pick ")+s.name}">${on?"✓":""}</button>`;
+}
+function rowClass(s,base){
+  var a=active();
+  return base+(a&&a.id===s.id?" active":"")+(picked(s.id)&&s.status!=="declined"?"":" off")+(flashing(s.id)?" flash":"");
+}
+function renderTree(){
+  var list=model.suggestions,live=model.canonical;
+  var dupes=list.length-live.length;
+  setHtml($("#tools"),list.length?html`${dupes?html`<div class="plan-warning">${dupes+" suggestion"+(dupes===1?"":"s")+" repeat an id already in the plan. Only the first of each id is actionable — ask the agent to give them distinct ids."}</div>`:""}${
+    list.map(function(s){
+      if(s.duplicate)return html`<div class="tool dupe" title="${"duplicate id: "+s.id}"><i class="tool-status st-unknown"></i><span class="tool-name">${s.name}</span><span class="dupe-badge">duplicate id</span></div>`;
+      return html`<div class="${rowClass(s,"tool")}" data-suggestion="${s.id}"><i class="tool-status ${statusClass(s.status)}" title="${s.status}"></i><span class="tool-name">${s.name}</span>${checkBox(s)}</div>`;
+    })
+  }${html`<button class="tool tool-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="tool-name">Request tool</span></button>`}`:html`<div class="empty-state">No tool suggestions yet. This page updates the moment the agent writes the interactive plan.</div>`);
+
+  setHtml($("#outline"),html`<button class="outline-page ${ui.outlineOpen?"open":""}" data-outline-toggle><span class="outline-chevron">›</span><span class="outline-route">${model.site||model.journey||"Interactive plan"}</span><span class="outline-total">${live.length+" suggestion"+(live.length===1?"":"s")}</span></button><div class="outline-children ${ui.outlineOpen?"open":""}"><div class="outline-clip"><div class="outline-list">${
+    list.length?list.map(function(s){
+      if(s.duplicate)return html`<div class="outline-tool dupe"><i class="tool-status st-unknown"></i><span class="outline-name">${s.name}</span><span class="outline-summary">Duplicate id — not actionable</span><span class="dupe-badge">duplicate id</span></div>`;
+      return html`<div class="${rowClass(s,"outline-tool")}" data-suggestion="${s.id}"><i class="tool-status ${statusClass(s.status)}"></i><span class="outline-name">${s.name}</span><span class="outline-summary">${s.description||s.why}</span>${checkBox(s)}</div>`;
+    }):html`<div class="empty-state">Nothing to show yet.</div>`
+  }${list.length?html`<button class="outline-tool outline-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="outline-name">Request tool</span></button>`:""}</div></div></div>`);
+
+  $("#journeyLabel").textContent=model.site||model.journey||"Waiting for the plan…";
+  $("#journeyNode").title=model.site||"";
+  $("#pageCount").textContent=String(live.length);
+  $("#treeScroll").classList.toggle("outline-mode",ui.view==="outline");
+  $$("[data-view]").forEach(function(b){b.classList.toggle("active",b.dataset.view===ui.view)});
+  renderExtras();
+  requestAnimationFrame(renderLinks);
+}
+/* Files and plan fields this page has no opinion about are still the user's
+   record — show them read-only rather than dropping them. */
+function renderExtras(){
+  var host=$("#extras"),items=model.planExtras,filesOver=model.extraFiles;
+  if(!items.length&&!filesOver.length)return setHtml(host,"");
+  setHtml(host,html`<details class="disclosure extras-panel" id="extrasPanel" ${ui.open.get("extrasPanel")?"open":""}><summary>Also in the state folder<span class="summary-count">${items.length+filesOver.length}</span></summary><div class="disclosure-body">${
+    items.length?html`<section class="field"><div class="label">Plan fields</div>${items.map(function(e){
+      return html`<div class="annotatable"><b>${e.key}:</b> ${e.value}</div>`;
+    })}</section>`:""
+  }${
+    filesOver.length?html`<section class="field"><div class="label">Other files</div>${filesOver.map(function(f){
+      var full=ui.expandedFiles.has(f.name),cut=!full&&f.text.length>PREVIEW;
+      return html`<div class="extra-file"><b>${f.name}</b><pre>${cut?f.text.slice(0,PREVIEW):f.text}</pre>${
+        cut?html`<button class="small" data-expand-file="${f.name}">truncated at ${PREVIEW+" of "+f.text.length} characters — show all</button>`:""
+      }</div>`;
+    })}</section>`:""
+  }</div></details>`);
+}
+function svgPath(d){
+  var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d",d);return path;
+}
+function renderLinks(){
+  var map=$(".map"),svg=$("#mapLinks"),root=$(".map>.root"),page=$(".map>.page"),cards=$$("#tools>.tool");
+  if(!map||!svg||!root||!page||ui.view!=="map")return;
+  var box=map.getBoundingClientRect(),point=function(el,side){var r=el.getBoundingClientRect();return{x:(side==="right"?r.right:r.left)-box.left,y:r.top+r.height/2-box.top}};
+  var a=point(root,"right"),b=point(page,"left"),from=point(page,"right"),group=document.createDocumentFragment();
+  group.appendChild(svgPath("M "+a.x+" "+a.y+" L "+b.x+" "+b.y));
+  cards.forEach(function(card){var to=point(card,"left"),bend=Math.max(30,(to.x-from.x)*.48);
+    group.appendChild(svgPath("M "+from.x+" "+from.y+" C "+(from.x+bend)+" "+from.y+" "+(to.x-bend)+" "+to.y+" "+to.x+" "+to.y))});
+  svg.setAttribute("viewBox","0 0 "+map.scrollWidth+" "+map.scrollHeight);
+  svg.setAttribute("width",map.scrollWidth);svg.setAttribute("height",map.scrollHeight);
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  svg.appendChild(group);
+}
+/* The one raw-HTML producer: every slice and token is escaped on the way in. */
+function codeHtml(text){
+  var re=/(?:\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:const|let|var|await|async|function|return|new|import|export|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b)/gm,at=0,out="";
+  text.replace(re,function(token,index){
+    out+=esc(text.slice(at,index));
+    var c=token.indexOf("//")===0?"comment":/^['"]/.test(token)?"string":/^\d/.test(token)?"number":"keyword";
+    out+='<span class="tok-'+c+'">'+esc(token)+"</span>";at=index+token.length;
+  });
+  return new Html(out+esc(text.slice(at)));
+}
+function paramTable(s){
+  if(!s.params.length)return html`<p class="feedback-copy">No parameters described yet.</p>`;
+  return html`<div class="schema"><div class="sh">Parameter</div><div class="sh">Type</div><div class="sh">Description</div>${
+    s.params.map(function(p){return html`<div><code>${p.name||"—"}</code></div><div>${p.type||"—"}</div><div>${p.description}</div>`})
+  }</div>`;
+}
+function codeSection(s){
+  var code=model.code.get(s.id);
+  if(!code)return html`<p class="feedback-copy">The agent writes the tool code once you submit the interactive plan. It appears here, read only, for review.</p>`;
+  return html`<div class="codebox"><div class="codehead"><span>${code.file}</span><span>${code.lang}</span></div><pre class="codeview">${codeHtml(code.text)}</pre></div>`;
+}
+function whySection(s){
+  return html`${s.why?html`<section class="decision-card"><div class="label">Why this tool</div><div class="annotatable">${s.why}</div></section>`
+    :html`<p class="feedback-copy">The user need for this tool has not been described yet.</p>`}${
+    s.extras.length?html`<section class="decision-card"><div class="label">Also in the plan</div>${s.extras.map(function(e){
+      return html`<div class="annotatable"><b>${e.key}:</b> ${e.value}</div>`})}</section>`:""}`;
+}
+function stepChips(s){
+  var st=model.steps.get(s.id);
+  if(!st)return"";
+  var names=["code","verify"];
+  st.forEach(function(v,k){if(names.indexOf(k)<0)names.push(k)});
+  return html`<div class="step-chips">${names.map(function(k){
+    var rec=st.get(k);
+    if(!rec)return html`<span class="step-chip">${k}</span>`;
+    var state=rec.state,outcome=rec.outcome;
+    // An outcome is the stronger claim wherever it appears; unknown ones stay neutral
+    // and show their raw text rather than borrowing a colour they did not earn.
+    if(outcome)return html`<span class="step-chip ${outcomeClass(outcome)}" title="${k+" outcome: "+outcome}">${k+" "+outcomeGlyph(outcome)+" "+outcome}</span>`;
+    // A verify that finished without recording an outcome asserts nothing: never green.
+    if(k==="verify"&&state==="done")return html`<span class="step-chip" title="verify finished without recording an outcome">${"verify — no outcome"}</span>`;
+    return html`<span class="step-chip ${stepClass(state)}">${k}${state==="done"?" ✓":state==="start"?" …":""}</span>`;
+  })}</div>`;
+}
+function noteSection(s){
+  var p=model.phase,text=note(s.id),copy,primary;
+  if(p==="verify"||p==="done")return html`<p class="feedback-copy">${p==="verify"?"Approval received. The agent is running final verification and opening the PR.":"The run is complete."}</p>`;
+  if(p==="review"){copy="Ask the agent to change this tool, or ask a question about it.";primary={id:"sendNote",label:"Send feedback"}}
+  else if(p==="build"){copy="The agent is building. Notes reach it without stopping the build.";primary={id:"sendNote",label:"Send note"}}
+  else{copy="Add a note to send with the interactive plan — it is saved as you type.";primary=null}
+  return html`<p class="feedback-copy">${copy}</p><textarea class="whole" id="toolNote" placeholder="Describe a change or ask a question…">${text}</textarea>${
+    primary?html`<div class="note-actions"><span class="tool-feedback-status">${text.trim()?"Note added":"No note yet"}</span><span class="spacer"></span><button class="small primary" id="${primary.id}" type="button">${primary.label}</button></div>`:""
+  }`;
+}
+function disclosure(id,title,count,body){
+  return html`<details class="disclosure" id="${id}" ${ui.open.get(id)?"open":""}><summary>${title}${count===null?"":html`<span class="summary-count">${count}</span>`}</summary><div class="disclosure-body">${body}</div></details>`;
+}
+/* Which suggestion the detail pane is currently showing. Re-rendering the same
+   one keeps its scroll (a file-watcher update must not yank the reader); moving
+   to a different one starts at the top of the new description. */
+var detailShowing=null;
+function renderDetail(){
+  var s=active();
+  $(".workspace").classList.toggle("no-selection",!s);
+  if(!s){
+    detailShowing=null;
+    $("#title").textContent="No suggestion selected";
+    $("#statusPill").hidden=true;$("#changeTag").hidden=true;$("#selection").hidden=true;
+    setHtml($("#content"),html`<div class="empty-state">The interactive plan is empty or has not been written yet.<br>This page follows <code>plan.json</code> in the state folder — it fills in as soon as the agent writes it.</div>`);
+    return;
+  }
+  var focused=document.activeElement&&document.activeElement.id==="toolNote"?
+        [document.activeElement.selectionStart,document.activeElement.selectionEnd]:null,
+      sameTool=detailShowing===s.id,
+      scrollWas=content.scrollTop;
+  detailShowing=s.id;
+  $("#title").textContent=s.name;
+  $("#statusPill").hidden=false;
+  $("#statusPill").className="status-pill "+statusClass(s.status);
+  $("#statusPillText").textContent=s.status;
+  $("#changeTag").hidden=!flashing(s.id);
+  $("#selection").hidden=false;
+  $("#selection").className="selection "+(picked(s.id)?"":"off");
+  $("#selection").textContent=picked(s.id)?"✓  Picked":"Not picked";
+  setHtml($("#content"),html`<section class="field"><div class="label">Description</div><div class="annotatable">${s.description||"No description yet."}</div></section><div class="meta-strip"><span class="meta-chip">${s.id}</span><span class="meta-chip">${s.status}</span><span class="meta-chip">${s.params.length+" param"+(s.params.length===1?"":"s")}</span></div>${stepChips(s)}${
+    disclosure("parameters","Parameters",s.params.length,paramTable(s))}${
+    disclosure("implementation","Generated code",null,codeSection(s))}${
+    disclosure("reasoning","Why this tool",null,whySection(s))}${
+    disclosure("notePanel","Notes and questions",note(s.id).trim()?1:0,noteSection(s))}`);
+  content.scrollTop=sameTool?scrollWas:0;
+  if(focused){
+    var box=$("#toolNote");
+    if(box){box.focus();try{box.setSelectionRange(focused[0],focused[1])}catch(e){}}
+  }
+}
+function renderChat(){
+  if(ui.awaitingReply&&claudeCount()>ui.claudeSeen)ui.awaitingReply=false;
+  var all=model.chat.concat(ui.chatLocal).sort(function(a,b){return a.ts<b.ts?-1:a.ts>b.ts?1:0}),
+      chat=$("#chat"),hidden=Math.max(0,all.length-CHAT_WINDOW),
+      empty=!all.length&&!ui.awaitingReply;
+  $(".review").classList.toggle("collapsed",empty);
+  $(".app").classList.toggle("no-chat",empty);
+  var shown=(ui.chatExpanded||!hidden)?all:all.slice(-CHAT_WINDOW);
+  // A new message always comes into view; otherwise only stick when already at the bottom.
+  var grew=all.length>ui.chatCount;
+  ui.chatCount=all.length;
+  var stick=grew||chat.scrollTop+chat.clientHeight>=chat.scrollHeight-30;
+  setHtml(chat,html`${
+    (hidden&&!ui.chatExpanded)?html`<button class="small chat-earlier" id="showEarlier">Show ${hidden} earlier</button>`:""
+  }${shown.map(function(m){
+    return html`<div class="msg ${m.who==="claude"?"claude":"you"}"><span class="who">${(m.who==="you"?"you":"agent")+(m.re?" · "+m.re:"")}</span>${m.text}</div>`;
+  })}${ui.awaitingReply?html`<div class="msg claude typing"><span class="who">agent</span><span class="dots"><i></i><i></i><i></i></span></div>`:""}${
+    empty?html`<div class="chat-empty">Notes you send and the agent's replies appear here.</div>`:""}`);
+  if(stick||ui.awaitingReply)chat.scrollTop=chat.scrollHeight;
+}
+var PHASE_COPY={
+  boot:{status:"Waiting for the agent",label:"Note for the agent",placeholder:"Ask a question (optional)"},
+  propose:{status:"Interactive plan ready",label:"Note for the whole plan",placeholder:"Ask a question or request a change before you submit (optional)"},
+  build:{status:"Building tools",label:"Note for the agent",placeholder:"Send a note while the tools are being built"},
+  review:{status:"Ready for review",label:"Feedback on the plan",placeholder:"Request a change across the plan, or ask a question"},
+  verify:{status:"Verifying tools",label:"Verification in progress",placeholder:""},
+  done:{status:"Run complete",label:"Conversation closed",placeholder:""}
+};
+function phaseCopy(p){
+  return Object.prototype.hasOwnProperty.call(PHASE_COPY,p)?PHASE_COPY[p]
+    :{status:p,label:"Note for the agent",placeholder:"Ask a question (optional)"};
+}
+function renderPhase(){
+  var order=["propose","build","review","verify","done"],current=model.phase,index=order.indexOf(current);
+  $$("#phaseSteps [data-phase-step]").forEach(function(el){
+    var at=order.indexOf(el.dataset.phaseStep),active=at===index;
+    el.classList.toggle("current",active);el.classList.toggle("complete",index>at);
+    if(active)el.setAttribute("aria-current","step");else el.removeAttribute("aria-current");
+  });
+}
+function noteCount(){
+  var k=0;
+  model.canonical.forEach(function(s){if(note(s.id).trim())k++});
+  if(ui.general.trim())k++;
+  return k;
+}
+/* Every state the status box can be in — it is the one place that always says
+   what is happening and what to do next. */
+function statusLine(p,list,n){
+  if(ui.connDown)return "Connection to the agent lost — reconnecting…";
+  if(!list.length)return "Waiting for the agent to write the plan…";
+  if(p==="propose"||p==="boot"){
+    if(ui.submitted)return "Plan submitted · waiting for the coding agent…";
+    // Status-bar idiom: short segments, not prose.
+    var total=list.length,k=noteCount(),segs=[];
+    if(!n)segs.push("No tools selected");
+    else if(n===total)segs.push(total===1?"1 tool selected":"All "+total+" tools selected");
+    else segs.push(n+" of "+total+" selected");
+    if(n&&n<total)segs.push((total-n)+" will be skipped");
+    if(k)segs.push(k===1?"1 note attached":k+" notes attached");
+    segs.push(n?"ready to submit":"pick at least one to build");
+    return segs.join(" · ");
+  }
+  if(p==="build"){
+    var built=list.filter(function(s){return s.status==="review"||s.status==="approved"}).length,
+        cur=list.filter(function(s){return s.status==="building"})[0];
+    if(!built&&!cur)return "Plan submitted. Waiting for a response from the coding agent…";
+    return "The coding agent is building the tools — "+built+" done"+(cur?", now building "+cur.name:"")+"…";
+  }
+  if(p==="review"){
+    var b=list.filter(function(s){return s.status==="review"||s.status==="approved"}).length;
+    return b+" tool"+(b===1?"":"s")+" built. Review the code, then click Approve — or send feedback for another round.";
+  }
+  if(p==="verify")return "Approved. The coding agent is verifying the tools and opening the PR…";
+  if(p==="done")return "Run complete — the tools are shipped and the PR is open.";
+  return "Waiting for the agent…";
+}
+function renderRail(p){
+  var dead=p==="verify"||p==="done"||!model.canonical.length;
+  $("#railNote").disabled=dead;
+  $("#railRequest").disabled=dead;
+  $("#railNote").classList.toggle("has-content",!!ui.general.trim());
+  if(dead&&ui.railMode)return closeRail();
+  if(!ui.railMode)return;
+  var noteMode=ui.railMode==="note";
+  $("#railFlyoutTitle").textContent=noteMode?"Note for the whole plan":"Request another tool";
+  $("#railFlyoutInput").placeholder=noteMode
+    ?(p==="review"?"What should change before you approve?":p==="build"?"The note reaches the agent without stopping the build…":"Ask a question or request a change — it rides along when you submit…")
+    :"Describe the tool or the missing capability…";
+  $("#railFlyoutAction").textContent=noteMode?(p==="propose"?"Save":p==="review"?"Send feedback":"Send"):"Request";
+}
+function renderReview(){
+  var p=model.phase,list=model.canonical,n=pickedIds().length,primary=$("#primaryAction");
+  renderPhase();
+  $("#statusBox").textContent=statusLine(p,list,n);
+  $("#tourButton").disabled=!list.length;
+  $("#tourButton").title=list.length?"Start the guided tour":"The tour is available once the agent suggests a tool";
+  primary.className="submit";
+  if(p==="review"){primary.textContent="Approve tools";primary.disabled=false}
+  else if(p==="build"){primary.textContent="Plan submitted";primary.disabled=true}
+  else if(p==="verify"){primary.textContent="Verifying tools…";primary.disabled=true}
+  else if(p==="done"){primary.textContent="Approved";primary.disabled=true}
+  else if(ui.submitted){primary.textContent="Plan submitted";primary.disabled=true}
+  else{primary.textContent="Submit interactive plan";primary.disabled=!list.length||!n}
+  renderRail(p);
+}
+/* The mockup's simulated "coding agent" stage, now driven by real build steps. */
+function renderStage(){
+  var p=model.phase,running=p==="build"||p==="verify",show=running&&!ui.stageClosed;
+  $("#stageButton").hidden=!(running&&ui.stageClosed);
+  $("#stageButton").textContent=p==="verify"?"◈  Verification progress":"◈  Build progress";
+  $("#agentStage").hidden=!show;
+  if(!show)return;
+  $$("[data-process-step]").forEach(function(el){el.classList.toggle("active",el.dataset.processStep===p)});
+  $("#stageChip").textContent=p==="verify"?"Verification":"Coding agent";
+  $("#agentStageTitle").textContent=p==="verify"?"Verifying your tools":"Building your tools";
+  $("#agentStageSubtitle").textContent=p==="verify"?"Approval received. The agent is running the final verification ladder and opening the PR.":"The agent is turning the interactive plan into tool modules.";
+  $("#processingTitle").textContent=p==="verify"?"Verifying the approved tools…":"Building the picked tools…";
+  $("#processingCopy").textContent=p==="verify"?"The run is done only after the PR exists.":"Close this to keep browsing the plan — it stays live either way.";
+  var rows=model.canonical.filter(function(s){return model.steps.has(s.id)||s.status==="building"||s.status==="review"||s.status==="approved"});
+  setHtml($("#buildList"),rows.length?rows.map(function(s){
+    return html`<div class="build-row"><strong>${s.name}</strong>${stepChips(s)||html`<div class="step-chips"><span class="step-chip">queued</span></div>`}</div>`;
+  }):html`<div class="build-row"><strong>Starting…</strong></div>`);
+}
+function render(){renderTree();renderDetail();renderReview();renderStage();renderChat();maybeOfferTour()}
+
+function onFiles(){
+  model=normalize();
+  syncPicks();
+  markChanges();
+  if(prevPhase&&model.phase!==prevPhase){
+    ui.stageClosed=false;ui.submitted=false;
+    if(model.phase==="build")toast("The agent is building your tools");
+    else if(model.phase==="review")toast("Tools are ready for review");
+    else if(model.phase==="verify")toast("Approved — the agent is verifying your tools");
+    else if(model.phase==="done")toast("Approved — the run is complete");
+  }
+  if(model.phase==="done")finished=true;
+  prevPhase=model.phase;
+  render();
+}
+
+/* ── Sending events ──────────────────────────────────────────────────────────── */
+function sendNote(id){
+  var text=note(id).trim();
+  if(!text)return toast("Write a note first");
+  var type=model.phase==="review"?"feedback":"comment";
+  if(!send({type:type,suggestion:id,text:text}))return;
+  ui.notes.delete(id);
+  expectReply();
+  toast(type==="feedback"?"Feedback sent":"Note sent to the agent");
+  render();
+}
+function submitPlan(){
+  var ids=pickedIds();
+  if(!ids.length)return toast("Pick at least one tool suggestion");
+  var general=ui.general.trim();
+  if(general)send({type:"comment",suggestion:null,text:general});
+  if(!send({type:"submit",picks:ids.map(function(id){return{suggestion:id,note:note(id).trim()}})}))return;
+  ui.notes.clear();ui.general="";ui.stageClosed=false;ui.submitted=true;closeRail();
+  toast("Interactive plan submitted");
+  render();
+}
+function sendGeneral(type){
+  var text=ui.general.trim();
+  if(!text)return toast("Write a note first");
+  if(!send({type:type,suggestion:null,text:text}))return;
+  ui.general="";
+  expectReply();
+  toast(type==="feedback"?"Feedback sent":"Note sent to the agent");
+  render();
+}
+function sendToolRequest(){
+  var text=ui.toolRequest.trim();
+  if(!text)return toast("Describe the tool or capability first");
+  if(!send({type:"comment",suggestion:null,text:"Tool request: "+text}))return;
+  ui.toolRequest="";
+  expectReply();
+  toast("Tool request sent to the agent");
+  render();
+}
+function approve(){
+  if(!send({type:"approve"}))return;
+  toast("Approved — the agent is shipping the tools");
+}
+
+/* ── Wiring ──────────────────────────────────────────────────────────────────── */
+var toastTimer=null;
+function toast(msg){var t=$("#toast");clearTimeout(toastTimer);t.textContent=msg;t.classList.add("show");toastTimer=setTimeout(function(){t.classList.remove("show")},1700)}
+function closeRail(){var f=$("#railFlyout");ui.railMode=null;if(f.open)f.close()}
+function openRail(mode){
+  ui.railMode=mode;
+  var f=$("#railFlyout");
+  if(!f.open)f.showModal();
+  var t=$("#railFlyoutInput");
+  t.value=mode==="note"?ui.general:ui.toolRequest;
+  renderRail(model?model.phase:"boot");
+  updateRailCount();
+  t.focus();
+}
+function updateRailCount(){
+  var t=$("#railFlyoutInput");
+  $("#railFlyoutCount").textContent=t.value.length+"/"+t.maxLength;
+}
+document.addEventListener("click",function(e){
+  var x=e.target.closest("[data-toggle]");
+  if(x){e.preventDefault();e.stopPropagation();return setPick(x.dataset.toggle,!picked(x.dataset.toggle))}
+  if(e.target.closest("#showEarlier")){ui.chatExpanded=true;return renderChat()}
+  x=e.target.closest("[data-expand-file]");
+  if(x){ui.expandedFiles.add(x.dataset.expandFile);return renderExtras()}
+  x=e.target.closest("[data-outline-toggle]");
+  if(x){ui.outlineOpen=!ui.outlineOpen;return renderTree()}
+  x=e.target.closest("[data-suggestion]");
+  if(x){ui.activeId=x.dataset.suggestion;return render()}
+});
+var content=$("#content"),scrollBefore=0;
+content.addEventListener("pointerdown",function(e){if(e.target.closest("summary"))scrollBefore=content.scrollTop});
+document.addEventListener("toggle",function(e){if(e.target.id)ui.open.set(e.target.id,e.target.open)},true);
+content.addEventListener("toggle",function(){requestAnimationFrame(function(){content.scrollTop=Math.min(scrollBefore,Math.max(0,content.scrollHeight-content.clientHeight))})},true);
+content.addEventListener("input",function(e){
+  if(e.target.id!=="toolNote")return;
+  var s=active();if(!s)return;
+  ui.notes.set(s.id,e.target.value);
+  renderReview(); // the status box counts notes live
+});
+content.addEventListener("change",function(e){
+  if(e.target.id!=="toolNote"||model.phase!=="propose")return;
+  var s=active();if(!s)return;
+  var text=e.target.value.trim();
+  logLocal(s.name,text?"Added a note: \u201c"+text+"\u201d":"Removed the note");
+});
+content.addEventListener("click",function(e){
+  var s=active();if(!s)return;
+  if(e.target.closest("#sendNote")){ui.notes.set(s.id,$("#toolNote").value);return sendNote(s.id)}
+});
+$("#railNote").onclick=function(){ui.railMode==="note"?closeRail():openRail("note")};
+$("#railRequest").onclick=function(){ui.railMode==="request"?closeRail():openRail("request")};
+document.addEventListener("click",function(e){if(e.target.closest("[data-request-tool]"))openRail("request")});
+$("#railFlyoutClose").onclick=closeRail;
+$("#railFlyout").addEventListener("click",function(e){if(e.target===$("#railFlyout"))closeRail()});
+$("#railFlyout").addEventListener("close",function(){ui.railMode=null});
+$("#railFlyoutInput").addEventListener("input",function(e){
+  if(ui.railMode==="note"&&model&&model.phase==="propose")ui.general=e.target.value; // saved as you type
+  updateRailCount();
+});
+$("#railFlyoutAction").onclick=function(){
+  var v=$("#railFlyoutInput").value,p=model?model.phase:"boot";
+  if(ui.railMode==="note"){
+    var had=ui.general.trim();
+    ui.general=v;
+    if(p==="propose"||p==="boot"){
+      if(v.trim())logLocal(null,"Added a note for the whole plan: \u201c"+v.trim()+"\u201d");
+      else if(had)logLocal(null,"Removed the note for the whole plan");
+      toast(v.trim()?"Note saved — it rides along with the plan":"Note cleared");closeRail();return renderReview()}
+    sendGeneral(p==="review"?"feedback":"comment");
+    return closeRail();
+  }
+  if(!v.trim())return toast("Describe the tool or capability first");
+  ui.toolRequest=v;
+  sendToolRequest();
+  closeRail();
+};
+$$("[data-view]").forEach(function(b){b.onclick=function(){ui.view=b.dataset.view;renderTree()}});
+$("#selection").onclick=function(){var s=active();if(s)setPick(s.id,!picked(s.id))};
+$("#detailClose").onclick=function(){ui.activeId=null;render()};
+$("#primaryAction").onclick=function(){
+  var p=model.phase;
+  if(p==="review")return approve();
+  if(p==="build"||p==="verify"||p==="done")return;
+  submitPlan();
+};
+$("#closeAgentStage").onclick=function(){ui.stageClosed=true;renderStage()};
+$("#stageButton").onclick=function(){ui.stageClosed=false;renderStage()};
+
+function setTheme(theme){
+  document.documentElement.dataset.theme=theme;
+  $("#themeLabel").textContent=theme==="dark"?"Light":"Dark";
+  $("#themeButton").setAttribute("aria-label","Switch to "+(theme==="dark"?"light":"dark")+" mode");
+  try{localStorage.setItem("webmcp-explorer-theme",theme)}catch(e){}
+}
+setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
+$("#themeButton").onclick=function(){setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark")};
+
+/* ── Guided tour ─────────────────────────────────────────────────────────────── */
+var tourKey="webmcp-explorer-tour-seen",tourInvitePending=false,tourInviteOffered=false,tourInviteTimer=null;
+function markTourSeen(){tourInviteOffered=true;tourInvitePending=false;clearTimeout(tourInviteTimer);try{localStorage.setItem(tourKey,"1")}catch(e){}$("#tourInvite").classList.remove("show")}
+function maybeOfferTour(){
+  if(!model||!model.canonical.length){$("#tourInvite").classList.remove("show");return}
+  if(tourInvitePending||tourInviteOffered)return;
+  try{if(localStorage.getItem(tourKey)){tourInviteOffered=true;return}}catch(e){}
+  tourInvitePending=true;
+  tourInviteTimer=setTimeout(function(){
+    tourInvitePending=false;
+    if(!model||!model.canonical.length)return;
+    try{if(localStorage.getItem(tourKey)){tourInviteOffered=true;return}}catch(e){}
+    $("#tourInvite").classList.add("show");tourInviteOffered=true;
+  },500);
+}
+function runTour(){
+  if(!model||!model.canonical.length)return toast("The tour is available once the agent suggests a tool");
+  markTourSeen();
+  // The tour's detail stops need a selected tool and a visible detail pane.
+  // If the tour makes that selection itself, it undoes it when it ends.
+  var tourSelected=false;
+  if(!active()){ui.activeId=model.canonical[0].id;tourSelected=true}
+  ui.view="map";
+  render();
+  requestAnimationFrame(function(){
+    var factory=window.driver&&window.driver.js&&window.driver.js.driver;
+    if(!factory){
+      // The selection was only made for the tour — undo it if the tour cannot run.
+      if(tourSelected){ui.activeId=null;render()}
+      return toast("Tour is unavailable offline. Try again when connected.");
+    }
+    var details=$$("#content details"),openState=details.map(function(d){return d.open}),scrollState=content.scrollTop,restored=false,
+        dark=document.documentElement.dataset.theme==="dark";
+    function fitTourSection(current){
+      details.forEach(function(d){d.classList.toggle("tour-section",d===current)});
+      if(!current)return;
+      current.style.maxHeight=Math.max(220,content.clientHeight-18)+"px";
+      var box=content.getBoundingClientRect(),rect=current.getBoundingClientRect();
+      content.scrollTop+=rect.top-box.top;scrollBefore=content.scrollTop;
+    }
+    function restoreTourState(){
+      if(restored)return;
+      restored=true;
+      details.forEach(function(d,i){d.open=openState[i];d.classList.remove("tour-section");d.style.maxHeight=""});
+      if(tourSelected){ui.activeId=null;render();return}
+      setTimeout(function(){content.scrollTop=Math.min(scrollState,Math.max(0,content.scrollHeight-content.clientHeight))},50);
+    }
+    function expandedSection(selector){
+      return function(){
+        var current=$(selector);
+        if(!current)return undefined;
+        details.forEach(function(d){d.open=d===current});
+        fitTourSection(current);
+        return current;
+      };
+    }
+    var tour=factory({
+      showProgress:true,progressText:"{{current}} of {{total}}",nextBtnText:"Next",prevBtnText:"Back",doneBtnText:"Done",
+      popoverClass:"webmcp-tour",overlayColor:dark?"#010302":"#101612",overlayOpacity:dark?.82:.48,
+      onHighlightStarted:function(element){
+        var current=element&&element.closest&&element.closest("details");
+        if(!current)return fitTourSection(null);
+        details.forEach(function(d){d.open=d===current});
+        fitTourSection(current);
+      },
+      onDestroyStarted:function(element,step,options){restoreTourState();options.driver.destroy()},
+      onDestroyed:restoreTourState,
+      steps:[
+        {element:".tree-panel",popover:{title:"The interactive plan",description:"Every tool the agent suggests for this site, live. The page follows the agent's state folder — it updates itself, there is nothing to refresh.",side:"right"}},
+        {element:"#tools .tool.active",popover:{title:"Pick a tool suggestion",description:"Select a suggestion to inspect it. Unpick the ones the agent should not build.",side:"right"}},
+        {element:expandedSection("#notePanel"),popover:{title:"Notes and questions",description:"Write a note on the selected suggestion — it is saved as you type and rides along when you submit the plan.",side:"left"}},
+        {element:".detail",popover:{title:"Inspect the suggestion",description:"Description, parameters, the generated code, and the agent's reasoning for this one tool.",side:"left"}},
+        {element:expandedSection("#parameters"),popover:{title:"Parameters",description:"The inputs the tool takes, and what each one means.",side:"left"}},
+        {element:expandedSection("#implementation"),popover:{title:"Generated code",description:"Read-only. The agent writes the tool code after you submit the plan; it lands here for review.",side:"left"}},
+        {element:expandedSection("#reasoning"),popover:{title:"Why this tool",description:"The user need this tool serves — the record that ships with the change.",side:"left"}},
+        {element:".side-rail",popover:{title:"Plan-wide note & tool requests",description:"Add a note that spans the whole plan, or request a capability the plan is missing.",side:"left"}},
+        {element:"#statusBox",popover:{title:"Status bar",description:"The one place that always says where the run is and what to do next.",side:"top"}},
+        {element:"#primaryAction",popover:{title:"Submit, then iterate",description:"Submitting starts the build. When the tools are ready you review the code, send feedback as many rounds as you need, and approve.",side:"top"}}
+      ]
+    });
+    tour.drive();
+  });
+}
+$("#tourButton").onclick=runTour;$("#startTour").onclick=runTour;$("#dismissTour").onclick=markTourSeen;
+
+/* ── Layout resizers (in-memory only) ────────────────────────────────────────── */
+document.documentElement.style.setProperty("--review-h",ui.reviewHeight+"px");
+var resizing=false,resizer=$("#reviewResizer");
+function resizeReview(y){
+  var max=Math.min(480,innerHeight*.55),h=Math.round(Math.max(220,Math.min(max,innerHeight-y)));
+  ui.reviewHeight=h;document.documentElement.style.setProperty("--review-h",h+"px");requestAnimationFrame(renderLinks);
+}
+resizer.addEventListener("pointerdown",function(e){resizing=true;resizer.classList.add("dragging");resizer.setPointerCapture(e.pointerId);e.preventDefault()});
+resizer.addEventListener("pointermove",function(e){if(resizing)resizeReview(e.clientY)});
+resizer.addEventListener("pointerup",function(e){if(!resizing)return;resizing=false;resizer.classList.remove("dragging");resizer.releasePointerCapture(e.pointerId)});
+var detailDragging=false,detailResizer=$("#detailResizer");
+function inspectorBounds(){var min=350,max=Math.max(min,Math.min(680,innerWidth-690));return{min:min,max:max}}
+function setInspectorWidth(width){
+  var bounds=inspectorBounds(),w=Math.round(Math.max(bounds.min,Math.min(bounds.max,width)));
+  ui.inspectorWidth=w;document.documentElement.style.setProperty("--detail-w",w+"px");
+  detailResizer.setAttribute("aria-valuemin",bounds.min);detailResizer.setAttribute("aria-valuemax",bounds.max);detailResizer.setAttribute("aria-valuenow",w);
+  requestAnimationFrame(renderLinks);
+}
+setInspectorWidth(ui.inspectorWidth);
+detailResizer.addEventListener("pointerdown",function(e){detailDragging=true;detailResizer.classList.add("dragging");detailResizer.setPointerCapture(e.pointerId);document.body.style.cursor="col-resize";document.body.style.userSelect="none";e.preventDefault()});
+detailResizer.addEventListener("pointermove",function(e){if(!detailDragging)return;var box=$(".workspace").getBoundingClientRect();setInspectorWidth(box.right-e.clientX-18)});
+detailResizer.addEventListener("pointerup",function(e){if(!detailDragging)return;detailDragging=false;detailResizer.classList.remove("dragging");detailResizer.releasePointerCapture(e.pointerId);document.body.style.cursor="";document.body.style.userSelect=""});
+detailResizer.addEventListener("keydown",function(e){
+  if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight"&&e.key!=="Home"&&e.key!=="End")return;
+  var bounds=inspectorBounds(),step=e.shiftKey?40:16,
+      next=e.key==="Home"?bounds.min:e.key==="End"?bounds.max:ui.inspectorWidth+(e.key==="ArrowLeft"?step:-step);
+  setInspectorWidth(next);e.preventDefault();
+});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"){ui.stageClosed=true;renderStage();closeRail()}});
+window.addEventListener("resize",function(){resizeReview(innerHeight-ui.reviewHeight);setInspectorWidth(ui.inspectorWidth);renderLinks()});
+
+model=normalize();
+render();
+connect();
+})();
+</script>
+</body>
+</html>

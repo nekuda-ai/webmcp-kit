@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "nekuda",
+  "description": "nekuda's Claude Code plugins, including WebMCP Kit.",
+  "owner": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
+  "metadata": {
+    "homepage": "https://github.com/nekuda-ai/webmcp-kit",
+    "repository": "https://github.com/nekuda-ai/webmcp-kit"
+  },
+  "plugins": [
+    {
+      "name": "webmcp-kit",
+      "source": "./plugin",
+      "version": "0.2.0",
+      "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement against @agentlane/webmcp, and verify the tools in a browser.",
+      "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
+      "homepage": "https://github.com/nekuda-ai/webmcp-kit",
+      "repository": "https://github.com/nekuda-ai/webmcp-kit",
+      "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"],
+      "category": "development"
+    }
+  ]
+}
