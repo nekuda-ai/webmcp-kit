@@ -10,12 +10,12 @@
 // looks for the round-1 marker in the conventional locations first and only then walks the
 // whole tree (throttled — a real repo carries node_modules/.git), skipping `.webmcp/`.
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import { connect as tcpConnect } from "node:net";
 import { join, sep } from "node:path";
 
 const root = process.argv[2] ?? process.cwd();
-const portFile = join(root, ".webmcp", ".port");
+const runFile = join(root, ".webmcp", ".run.json");
 const DEADLINE_MS = Number(process.env.ROBOT_DEADLINE_MS ?? 600_000);
 const STEP_TIMEOUT_MS = Number(process.env.ROBOT_STEP_TIMEOUT_MS ?? 180_000);
 const NONCE = process.env.ROBOT_NONCE ?? Date.now().toString(36).slice(-6);
@@ -34,6 +34,9 @@ const phase = () => {
 };
 const chatCount = () => ndjson("_chat.ndjson").length;
 const statusLines = () => ndjson("_status.ndjson");
+const handled = (eventId: string) => ndjson("_ack.ndjson").some(
+  (entry) => entry.run_id === run.run_id && entry.event_id === eventId && entry.status === "handled",
+);
 const plan = () => {
   try { return JSON.parse(files["plan.json"]); } catch { return null; }
 };
@@ -99,35 +102,73 @@ function waitFor(desc: string, pred: () => boolean): Promise<void> {
   });
 }
 
-// .webmcp/ is git-tracked, so .port is untrusted input: only a plain decimal port may ever
-// reach the ws URL (a value like "80@attacker.example" would redirect the connection).
-function livePort(): number | null {
+type Run = { version: 1; run_id: string; capability: string; workspace: string; port: number; pid: number; started_at: string };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function liveRun(): Run | null {
   try {
-    const raw = readFileSync(portFile, "utf8").trim();
-    if (!/^[0-9]{1,5}$/.test(raw)) return null;
-    const n = Number(raw);
-    return n >= 1 && n <= 65535 ? n : null;
+    const value = JSON.parse(readFileSync(runFile, "utf8"));
+    if (Object.keys(value).sort().join(",") !== "capability,pid,port,run_id,started_at,version,workspace") return null;
+    if (value.version !== 1 || value.workspace !== realpathSync(root)) return null;
+    if (!UUID.test(value.run_id) || !UUID.test(value.capability) || value.run_id === value.capability) return null;
+    if (!Number.isInteger(value.port) || value.port < 1 || value.port > 65535) return null;
+    if (!Number.isSafeInteger(value.pid) || value.pid < 1) return null;
+    if (typeof value.started_at !== "string" || new Date(value.started_at).toISOString() !== value.started_at) return null;
+    return value;
   } catch {
     return null;
   }
 }
 
 let port = 0;
+let run: Run;
+type Recorded = { type: "recorded"; request_id: string; event_id: string; run_id: string; order: number };
+const requestWaiters = new Map<string, { resolve: (value: Recorded) => void; reject: (error: Error) => void }>();
+
+function receive(raw: unknown) {
+  const m = JSON.parse(String(raw));
+  if (m.type === "recorded" && typeof m.request_id === "string") {
+    const waiter = requestWaiters.get(m.request_id);
+    if (waiter) {
+      requestWaiters.delete(m.request_id);
+      if (m.run_id === run.run_id) waiter.resolve(m as Recorded);
+      else waiter.reject(new Error(`recorded wrong run ${m.run_id}`));
+    }
+    return;
+  }
+  if (m.type === "error") {
+    const waiter = requestWaiters.get(m.request_id);
+    if (waiter) {
+      requestWaiters.delete(m.request_id);
+      waiter.reject(new Error(m.message ?? "server rejected request"));
+    }
+    return;
+  }
+  if (m.type === "snapshot") { files = m.files; check(); }
+  if (m.type === "file" && typeof m.name === "string") {
+    if (m.text === null) delete files[m.name];
+    else if (typeof m.text === "string") files[m.name] = m.text;
+    check();
+  }
+}
+
 async function connect(): Promise<WebSocket> {
   for (let i = 0; i < 120; i++) {
-    const candidate = livePort();
+    const candidate = liveRun();
     if (candidate) {
       try {
-        port = candidate;
-        const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=page`);
+        run = candidate;
+        port = candidate.port;
+        const query = new URLSearchParams({ role: "page", capability: run.capability, run_id: run.run_id });
+        const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?${query}`);
+        ws.onmessage = (event) => receive(event.data);
         await new Promise<void>((res, rej) => { ws.onopen = () => res(); ws.onerror = () => rej(new Error("ws error")); });
-        console.log(`connected to the interactive loop on port ${port}`);
+        console.log(`connected to run ${run.run_id} on port ${port}`);
         return ws;
       } catch {}
     }
     await Bun.sleep(1000);
   }
-  console.error(`no server behind ${portFile}`);
+  console.error(`no live run behind ${runFile}`);
   process.exit(1);
   throw new Error("unreachable");
 }
@@ -135,16 +176,22 @@ async function connect(): Promise<WebSocket> {
 setTimeout(() => { console.error("GLOBAL DEADLINE exceeded"); process.exit(1); }, DEADLINE_MS);
 
 const ws = await connect();
-ws.onmessage = (e) => {
-  const m = JSON.parse(String(e.data));
-  if (m.type === "snapshot") { files = m.files; check(); }
-  if (m.type === "file" && typeof m.name === "string") {
-    if (m.text === null) delete files[m.name];
-    else if (typeof m.text === "string") files[m.name] = m.text;
-    check();
-  }
-};
-const send = (o: unknown) => { console.log(`send: ${JSON.stringify(o)}`); ws.send(JSON.stringify(o)); };
+function send(type: string, payload: unknown): Promise<Recorded> {
+  const requestId = crypto.randomUUID();
+  const request = { request_id: requestId, type, payload };
+  console.log(`send: ${JSON.stringify(request)}`);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      requestWaiters.delete(requestId);
+      reject(new Error(`TIMEOUT waiting for recorded response to ${type}`));
+    }, STEP_TIMEOUT_MS);
+    requestWaiters.set(requestId, {
+      resolve: (value) => { clearTimeout(timer); console.log(`recorded: ${value.event_id} order=${value.order}`); resolve(value); },
+      reject: (error) => { clearTimeout(timer); reject(error); },
+    });
+    ws.send(JSON.stringify(request));
+  });
+}
 setInterval(check, 300); // some predicates read the source tree, which sends no snapshot
 
 // 1. the interactive plan appears
@@ -154,19 +201,21 @@ const [a, b, c] = plan().suggestions;
 
 // 2. pick two, take a third and put it back (deselection must not build it), comment on the
 //    first, expect a live ack in _chat
-send({ type: "pick", suggestion: a.id, picked: true });
-send({ type: "pick", suggestion: b.id, picked: true });
-send({ type: "pick", suggestion: c.id, picked: true });
-send({ type: "pick", suggestion: c.id, picked: false });
+await send("pick", { suggestion: a.id, picked: true });
+await send("pick", { suggestion: b.id, picked: true });
+await send("pick", { suggestion: c.id, picked: true });
+await send("pick", { suggestion: c.id, picked: false });
 const chatBeforeNote = chatCount();
-send({ type: "comment", suggestion: a.id, text: "keep this one read-only" });
+const noteEvent = await send("comment", { suggestion: a.id, text: "keep this one read-only" });
 await waitFor("chat ack for the pre-build comment", () => chatCount() > chatBeforeNote);
+await waitFor("handled ack for the pre-build comment", () => handled(noteEvent.event_id));
 
 // 3. submit, then interject while Claude is mid-build (baselined: only lines appended
 //    after this submit count, so a previous run's build can't satisfy the wait)
 const statusAtSubmit = statusLines().length;
-send({ type: "submit", picks: [{ suggestion: a.id, note: "keep this one read-only" }, { suggestion: b.id, note: "" }] });
+const submitEvent = await send("submit", { picks: [{ suggestion: a.id, note: "keep this one read-only" }, { suggestion: b.id, note: "" }] });
 await waitFor("build started", () => statusLines().slice(statusAtSubmit).some((e) => e.state === "start"));
+await waitFor("handled ack for submit acceptance", () => handled(submitEvent.event_id));
 
 // 3b. by the FIRST build-start update the deselected suggestion must already read
 //     `declined` — an implementation must not leave it `proposed` all build and flip it
@@ -180,7 +229,7 @@ if (buildStartSuggestion?.status !== "declined") {
 console.log(`ok: deselected ${c.id} already declined at the first build-start update`);
 
 const chatBeforeMid = chatCount();
-send({ type: "comment", suggestion: b.id, text: "mid-build note: name the params exactly as planned" });
+const midBuildEvent = await send("comment", { suggestion: b.id, text: "mid-build note: name the params exactly as planned" });
 
 // 4. both tool modules built (code.md review copies), phase review reached by THIS build,
 //    mid-build comment answered
@@ -188,6 +237,7 @@ await waitFor("both code.md review copies + phase review", () =>
   !!files[`${a.id}.code.md`] && !!files[`${b.id}.code.md`] &&
   statusLines().slice(statusAtSubmit).some((e) => e.phase === "review") && phase() === "review");
 await waitFor("chat reply to the mid-build comment", () => chatCount() > chatBeforeMid);
+await waitFor("handled ack for the mid-build comment", () => handled(midBuildEvent.event_id));
 
 // 4b. the deselected suggestion was never built and stayed out of the build steps
 if (files[`${c.id}.code.md`]) { console.error(`FAIL: deselected ${c.id} was built`); process.exit(1); }
@@ -199,17 +249,19 @@ console.log(`ok: deselected ${c.id} not built, no build steps`);
 // 5. feedback round 1: a per-run marker, so a previous run's marker can't satisfy it —
 //    checked in the review copy AND in the real tool module under the source tree
 const marker = `// robot-check-${NONCE}`;
-send({ type: "feedback", suggestion: a.id, text: `add the exact comment line ${marker} to the ${a.id} tool module` });
+const feedbackOne = await send("feedback", { suggestion: a.id, text: `add the exact comment line ${marker} to the ${a.id} tool module` });
 await waitFor(`${a.id}.code.md contains ${marker}`, () => (files[`${a.id}.code.md`] ?? "").includes(marker));
 let modulePath: string | null = null;
 await waitFor(`the ${a.id} tool module under the source tree contains ${marker}`,
   () => !!(modulePath = toolModuleFor(a.id, marker)));
 console.log(`tool module carrying the feedback: ${modulePath}`);
+await waitFor("handled ack for feedback round 1", () => handled(feedbackOne.event_id));
 
 // 6. feedback round 2: checkable in the interactive plan
 const desc = `ROBOT-DESC-${NONCE}`;
-send({ type: "feedback", suggestion: b.id, text: `set the description of ${b.id} to exactly: ${desc}` });
+const feedbackTwo = await send("feedback", { suggestion: b.id, text: `set the description of ${b.id} to exactly: ${desc}` });
 await waitFor(`${b.id} description == ${desc}`, () => suggestion(b.id)?.description === desc);
+await waitFor("handled ack for feedback round 2", () => handled(feedbackTwo.event_id));
 
 // 7. every built suggestion carries a verify outcome before approval is possible
 const verified = (id: string) => statusLines().slice(statusAtSubmit).some(
@@ -229,9 +281,10 @@ function portReleased(): Promise<boolean> {
   });
 }
 let portFree = false;
-send({ type: "approve" });
+const approveEvent = await send("approve", {});
 await waitFor("phase verify", () =>
   statusLines().slice(statusAtSubmit).some((e) => e.phase === "verify"));
+await waitFor("handled ack for approval acceptance", () => handled(approveEvent.event_id));
 setInterval(async () => {
   if (!portFree && (await portReleased())) {
     portFree = true;

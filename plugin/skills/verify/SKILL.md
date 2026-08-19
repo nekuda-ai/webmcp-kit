@@ -15,8 +15,8 @@ Runtime check that a site's WebMCP tools register and work. Runs standalone, and
 
 ## Ladder
 1. **Boot.** Site starts; the baseline page renders; no *new* console errors versus a clean load.
-2. **Discover.** On each declared page and auth state — check anonymous **and** signed-in where relevant — list the registered tools. Confirm each tool appears where it should, is **absent** where it should not (logged-out account tools, wrong-role tools), and unregisters on its declared exits (empty cart, logout).
-3. **Invoke read-only.** Call read-only tools with sample inputs; check the returned data **and** the visible ui_effect.
+2. **Discover.** On each declared page and auth state — check anonymous **and** signed-in where relevant — list the registered tools. Confirm each tool appears where it should, is **absent** where it should not (logged-out account tools, wrong-role tools), and unregisters on its declared exits (empty cart, logout). Navigation is the expensive unit: visit each page × auth state **once** and settle every tool's expectations for that page in that single pass — never one navigation per tool.
+3. **Invoke read-only.** Call read-only tools with sample inputs; check the returned data **and** the visible ui_effect. Batch by page: invoke a page's tools in the visit that discovered them.
 4. **Invoke state-changing.** Only against local/dev/seeded data, with an explicit go-ahead. **Never** fire real POSTs at third-party or production services. No safe way to invoke → don't; report could-not-verify.
 
 ## Report — one state per tool

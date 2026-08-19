@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A small, local catalog of useful objects for calm rooms.">
+    <title>Reading Room Supply</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#catalog">Skip to catalog</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Reading Room Supply home">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <span>Reading Room Supply</span>
+      </a>
+      <p class="local-badge"><span aria-hidden="true"></span> Local studio shelf</p>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">Small-batch objects · Summer desk edit</p>
+          <h1 id="hero-title">Useful things for<br><em>unhurried rooms.</em></h1>
+          <p class="hero-copy">Browse a tiny working catalog, then reserve an object on the local studio shelf. Your shelf survives a server restart.</p>
+        </div>
+        <dl class="shelf-stats" aria-label="Live shelf summary">
+          <div><dt>Units on shelf</dt><dd id="available-units">—</dd></div>
+          <div><dt>Reservations</dt><dd id="reservation-count">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="workspace" aria-label="Catalog workspace">
+        <div class="catalog-pane">
+          <form class="filters" id="catalog-filters" role="search">
+            <div class="field search-field">
+              <label for="search">Search the collection</label>
+              <input id="search" name="q" type="search" placeholder="Try “warm light” or “cotton”" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="category">Category</label>
+              <select id="category" name="category"><option value="">All categories</option></select>
+            </div>
+            <label class="check-field"><input id="available" name="available" type="checkbox"> In stock only</label>
+            <button class="button button-dark" type="submit">Explore shelf</button>
+          </form>
+
+          <div class="catalog-heading">
+            <div>
+              <p class="eyebrow">The collection</p>
+              <h2 id="catalog">Studio shelf</h2>
+            </div>
+            <p id="result-count" aria-live="polite">Loading the shelf…</p>
+          </div>
+          <div class="product-grid" id="product-grid" aria-busy="true"></div>
+        </div>
+
+        <aside class="reservation-pane" aria-labelledby="reservations-title">
+          <div class="aside-heading">
+            <div>
+              <p class="eyebrow">Saved locally</p>
+              <h2 id="reservations-title">Your shelf</h2>
+            </div>
+            <span class="count-pill" id="aside-count">0</span>
+          </div>
+          <p class="aside-copy">Reserved pieces stay here until you release them or restore the fixture.</p>
+          <div id="reservation-list" class="reservation-list" aria-live="polite"></div>
+          <button class="text-button" id="reset-button" type="button">Restore starting inventory</button>
+        </aside>
+      </section>
+    </main>
+
+    <dialog id="reserve-dialog" aria-labelledby="dialog-title">
+      <form method="dialog" id="reserve-form">
+        <button class="dialog-close" value="cancel" type="submit" aria-label="Close reservation dialog">×</button>
+        <p class="eyebrow">Confirm a local change</p>
+        <h2 id="dialog-title">Reserve <span id="dialog-product-name"></span></h2>
+        <p id="dialog-copy">This updates the saved inventory on this local server.</p>
+        <input id="dialog-product-id" name="productId" type="hidden">
+        <div class="field quantity-field">
+          <label for="quantity">Quantity</label>
+          <select id="quantity" name="quantity">
+            <option value="1">1 piece</option>
+            <option value="2">2 pieces</option>
+            <option value="3">3 pieces</option>
+          </select>
+        </div>
+        <div class="dialog-actions">
+          <button class="button button-light" value="cancel" type="submit">Keep browsing</button>
+          <button class="button button-dark" id="confirm-reservation" value="default" type="submit">Confirm reservation</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

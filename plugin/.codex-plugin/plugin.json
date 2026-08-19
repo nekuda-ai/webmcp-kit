@@ -1,8 +1,12 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "webmcp-kit",
+  "version": "0.4.0",
   "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement the tools, and verify them in a browser.",
   "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
+  "homepage": "https://github.com/nekuda-ai/webmcp-kit",
   "repository": "https://github.com/nekuda-ai/webmcp-kit",
-  "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"]
+  "license": "MIT",
+  "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"],
+  "skills": "./skills/",
+  "hooks": "./com.openai/hooks/hooks.json"
 }

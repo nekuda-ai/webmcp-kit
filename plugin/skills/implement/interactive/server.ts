@@ -1,286 +1,405 @@
-// Interactive-loop relay server (NEK-693, ported from spike NEK-672). Bun, zero deps.
-// Folder-as-truth: watches the state folder `<root>/.webmcp/` and pushes changed files to
-// Explorer clients; appends page events to _feedback.ndjson and relays the actionable ones
-// to Claude's Monitor. Run: bun server.ts [repo root]   (default: cwd)
+// Explorer relay server. Bun, zero dependencies.
+//
+// A normal start creates a new logical run. `--resume` is the only way to retain the
+// identity and event order of a run whose server died without a clean shutdown.
 import {
-  watch, readdirSync, readFileSync, lstatSync, openSync, writeSync, closeSync,
-  linkSync, renameSync, unlinkSync, mkdirSync, constants,
+  closeSync,
+  constants,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  watch,
+  writeSync,
 } from "node:fs";
 import { join } from "node:path";
+import type { ServerWebSocket } from "bun";
+import {
+  AppendLimitError,
+  MAX_JOURNAL_BYTES,
+  MAX_REQUEST_BYTES,
+  MAX_JOURNAL_LINE_BYTES,
+  PROTOCOL_VERSION,
+  SERVICE,
+  appendDurable,
+  parseRecordedEnvelope,
+  parseRunFile,
+  readRegularText,
+  validateRequest,
+  type RecordedEnvelope,
+  type RunFileV1,
+} from "./protocol";
 
-const HEALTH = "webmcp-explorer";
-const ACTIONABLE = new Set(["comment", "submit", "feedback", "approve"]);
-const MAX_EVENT_BYTES = 64 * 1024;
-const stateDir = join(process.argv[2] ?? process.cwd(), ".webmcp");
+const ACTIONABLE = new Set(["comment", "feedback", "submit", "approve", "cancel"]);
+const MAX_RUNTIME_BYTES = 16 * 1024;
+
+function testDuration(name: string, fallback: number): number {
+  const value = process.env[name];
+  return value && /^[1-9][0-9]{1,5}$/.test(value) ? Number(value) : fallback;
+}
+
+const SERVER_LOCK_LEASE_MS = testDuration("WEBMCP_TEST_SERVER_LOCK_LEASE_MS", 60 * 1_000);
+const SERVER_LOCK_RENEW_MS = Math.min(
+  testDuration("WEBMCP_TEST_SERVER_LOCK_RENEW_MS", 10 * 1_000),
+  Math.max(10, Math.floor(SERVER_LOCK_LEASE_MS / 2)),
+);
+const args = process.argv.slice(2);
+const resume = args.includes("--resume");
+const positional = args.filter((arg) => !arg.startsWith("--"));
+const unknownFlags = args.filter((arg) => arg.startsWith("--") && arg !== "--resume");
+if (unknownFlags.length > 0 || positional.length > 1) {
+  console.error("usage: bun server.ts [workspace] [--resume]");
+  process.exit(2);
+}
+
+let workspace: string;
+try {
+  workspace = realpathSync(positional[0] ?? process.cwd());
+  if (!lstatSync(workspace).isDirectory()) throw new Error("not a directory");
+} catch (error) {
+  console.error(`refusing to start: invalid workspace (${(error as Error).message})`);
+  process.exit(1);
+  throw error;
+}
+
+const stateDir = join(workspace, ".webmcp");
+const runFile = join(stateDir, ".run.json");
+const lockFile = join(stateDir, ".server.lock");
 const portFile = join(stateDir, ".port");
-// .port is the live claim and is released on shutdown; .port.last survives it, so a
-// restart can rebind the same port. One origin across restarts keeps the page's
-// localStorage (tour dismissal, theme) and any open tab or printed URL valid (NEK-735).
 const lastPortFile = join(stateDir, ".port.last");
 const gitignoreFile = join(stateDir, ".gitignore");
-let ownPortFile = false;
+const feedbackFile = join(stateDir, "_feedback.ndjson");
 
-// The state folder must be a real directory: a repo can ship `.webmcp -> /elsewhere` and
-// every read and write below would go through it.
 function stateDirIsReal(): boolean {
   try {
-    return !lstatSync(stateDir).isSymbolicLink();
-  } catch {
-    return false; // absent
-  }
-}
-try {
-  if (lstatSync(stateDir).isSymbolicLink()) {
-    console.error(`refusing to start: ${stateDir} is a symlink; the state folder must be a real directory`);
-    process.exit(1);
-  }
-} catch {} // absent — mkdir creates a real directory
-mkdirSync(stateDir, { recursive: true });
-
-// .webmcp/ is git-tracked, so its contents are untrusted input: a port is only a port if
-// it is a regular file holding a plain decimal port number.
-function portNumberIn(file: string): number | null {
-  try {
-    if (!lstatSync(file).isFile()) return null;
-    const raw = readFileSync(file, "utf8").trim();
-    if (!/^[0-9]{1,5}$/.test(raw)) return null;
-    const n = Number(raw);
-    return n >= 1 && n <= 65535 ? n : null;
-  } catch {
-    return null;
-  }
-}
-function portFileValue(): number | null {
-  return portNumberIn(portFile);
-}
-
-// The port this run should try first: a stale .port (unclean death), else .port.last
-// (clean shutdown). 0 when neither exists or another live loop holds it.
-async function reusablePort(): Promise<number> {
-  const prev = portFileValue() ?? portNumberIn(lastPortFile);
-  if (prev === null) return 0;
-  if (await liveLoopOn(prev)) return 0; // a live loop owns that origin — stay off it
-  return prev;
-}
-
-function recordLastPort(port: number): void {
-  // Same untrusted-input rule as .port: never write through a planted non-file.
-  try {
-    if (!lstatSync(lastPortFile).isFile()) return;
-    unlinkSync(lastPortFile);
-  } catch {} // absent — fine
-  try {
-    writeFileExclusive(lastPortFile, String(port));
-  } catch {}
-}
-
-async function liveLoopOn(port: number): Promise<boolean> {
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(500) });
-    return (await res.text()) === HEALTH;
+    return lstatSync(stateDir).isDirectory() && !lstatSync(stateDir).isSymbolicLink();
   } catch {
     return false;
   }
 }
 
-const rand = () => crypto.randomUUID().slice(0, 8);
+try {
+  if (lstatSync(stateDir).isSymbolicLink()) {
+    console.error(`refusing to start: ${stateDir} is a symlink`);
+    process.exit(1);
+  }
+} catch {
+  // Absent is expected on the first run.
+}
+mkdirSync(stateDir, { recursive: true });
+if (!stateDirIsReal()) {
+  console.error(`refusing to start: ${stateDir} is not a real directory`);
+  process.exit(1);
+}
+try {
+  if (lstatSync(runFile).isSymbolicLink()) {
+    console.error("refusing to start: .webmcp/.run.json is a symlink");
+    process.exit(1);
+  }
+} catch {
+  // Absent is expected.
+}
 
-// Write the whole buffer through an exclusively created, never-followed descriptor.
 function writeFileExclusive(path: string, text: string): void {
   let fd: number | undefined;
   try {
     fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o644);
-    const buf = Buffer.from(text, "utf8");
-    if (writeSync(fd, buf, 0, buf.length) !== buf.length) throw new Error("short write");
+    const buffer = Buffer.from(text, "utf8");
+    const written = writeSync(fd, buffer, 0, buffer.length);
+    if (written !== buffer.length) throw new Error(`short write (${written}/${buffer.length} bytes)`);
+    fsyncSync(fd);
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
 }
 
-// A claim staged by a process that no longer exists is litter in a git-tracked folder.
-function scavengeStagedClaims(): void {
-  let names: string[] = [];
+function readRun(): RunFileV1 | null {
+  const text = readRegularText(runFile, MAX_RUNTIME_BYTES);
+  if (text === null) return null;
   try {
-    names = readdirSync(stateDir);
+    const parsed = parseRunFile(JSON.parse(text));
+    return parsed?.workspace === workspace ? parsed : null;
   } catch {
-    return;
-  }
-  for (const name of names) {
-    if (/^\.port\.stale\./.test(name)) {
-      try {
-        unlinkSync(join(stateDir, name)); // an evicted claim its evictor never got to delete
-      } catch {}
-      continue;
-    }
-    const owner = /^\.port\.(\d+)\./.exec(name);
-    if (!owner) continue;
-    try {
-      process.kill(Number(owner[1]), 0);
-      continue; // owner is alive (or not ours to judge) — leave it
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ESRCH") continue;
-    }
-    try {
-      unlinkSync(join(stateDir, name));
-    } catch {}
+    return null;
   }
 }
 
-// No eviction: another interactive loop may be live in the same repo. Claim .port with its
-// content in one publish — stage an exclusive, unguessable file, then link(2) it into place,
-// which fails if the name exists. If a live loop already holds it, leave the file to it and
-// warn — Claude sees this in the Bash output.
-async function claimPortFile(port: number): Promise<void> {
-  const stake = (): "claimed" | "taken" | "failed" => {
-    const tmp = `${portFile}.${process.pid}.${rand()}`;
+function explorerUrl(run: RunFileV1): string {
+  const query = new URLSearchParams({ capability: run.capability, run_id: run.run_id });
+  return `http://localhost:${run.port}/?${query}`;
+}
+
+function scopedUrl(run: RunFileV1, pathname: string): string {
+  const query = new URLSearchParams({ capability: run.capability, run_id: run.run_id });
+  return `http://127.0.0.1:${run.port}${pathname}?${query}`;
+}
+
+async function isLive(run: RunFileV1): Promise<boolean> {
+  try {
+    const response = await fetch(scopedUrl(run, "/healthz"), {
+      signal: AbortSignal.timeout(500),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as Record<string, unknown>;
+    return (
+      body.service === SERVICE &&
+      body.version === PROTOCOL_VERSION &&
+      body.run_id === run.run_id &&
+      body.workspace === workspace &&
+      Object.keys(body).sort().join(",") === "run_id,service,version,workspace"
+    );
+  } catch {
+    return false;
+  }
+}
+
+const initialRun = readRun();
+if (initialRun && (await isLive(initialRun))) {
+  console.log(`webmcp-explorer already live on ${explorerUrl(initialRun)}  state: ${stateDir}`);
+  process.exit(0);
+}
+if (resume && !initialRun) {
+  console.error("refusing to resume: .webmcp/.run.json is absent or invalid for this workspace");
+  process.exit(1);
+}
+
+const lockNonce = crypto.randomUUID();
+let ownLockText = JSON.stringify({
+  pid: process.pid,
+  nonce: lockNonce,
+  lease_expires_at_ms: Date.now() + SERVER_LOCK_LEASE_MS,
+});
+let ownLock = false;
+
+type LockOwner = { pid: number; nonce: string; lease_expires_at_ms: number };
+
+function lockOwnerAt(path: string): LockOwner | null {
+  const text = readRegularText(path, 4096);
+  if (text === null) return null;
+  try {
+    const value = JSON.parse(text) as Record<string, unknown>;
+    const keys = Object.keys(value).sort().join(",");
+    if (
+      (keys !== "lease_expires_at_ms,nonce,pid" &&
+        keys !== "created_at_ms,nonce,pid" &&
+        keys !== "nonce,pid") ||
+      !Number.isSafeInteger(value.pid) ||
+      (value.pid as number) < 1 ||
+      typeof value.nonce !== "string" ||
+      value.nonce.length > 128 ||
+      (keys === "lease_expires_at_ms,nonce,pid" &&
+        (!Number.isSafeInteger(value.lease_expires_at_ms) ||
+          (value.lease_expires_at_ms as number) < 0)) ||
+      (keys === "created_at_ms,nonce,pid" &&
+        (!Number.isSafeInteger(value.created_at_ms) || (value.created_at_ms as number) < 0))
+    ) {
+      return null;
+    }
+    return {
+      pid: value.pid as number,
+      nonce: value.nonce,
+      // Pre-lease development locks are recoverable migration input, never immortal.
+      lease_expires_at_ms:
+        keys === "lease_expires_at_ms,nonce,pid" ? (value.lease_expires_at_ms as number) : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sameLockOwner(left: LockOwner | null, right: LockOwner): boolean {
+  return (
+    left?.pid === right.pid &&
+    left.nonce === right.nonce &&
+    left.lease_expires_at_ms === right.lease_expires_at_ms
+  );
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+}
+
+async function acquireLock(): Promise<RunFileV1 | null> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const stage = `${lockFile}.claim.${process.pid}.${crypto.randomUUID()}`;
     try {
-      writeFileExclusive(tmp, String(port));
-      linkSync(tmp, portFile);
-      return "claimed";
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === "EEXIST") return "taken"; // someone else holds .port
-      console.log(`warning: could not write .webmcp/.port (${code ?? err}); the port printed below is authoritative`);
-      return "failed";
+      writeFileExclusive(stage, ownLockText);
+      linkSync(stage, lockFile);
+      ownLock = true;
+      return null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     } finally {
       try {
-        unlinkSync(tmp);
-      } catch {}
-    }
-  };
-  // Evict a stale claim by renaming it aside: only one racer's rename can win, so the losers
-  // never delete a file the winner has already replaced. `judged` is the value that was found
-  // stale — if .port changed while it was being probed, re-loop instead of evicting.
-  // The re-check → rename window is a deliberate TOCTOU, not an oversight: reaching it needs
-  // two starters racing a stale claim, and the worst case is a stranded `.port.stale.*` that
-  // the next start scavenges. The stdout port is authoritative (references/interactive.md),
-  // so nothing here is worth a lock file.
-  const evictStale = (judged: number | null): void => {
-    if (portFileValue() !== judged) return;
-    const aside = `${portFile}.stale.${rand()}`;
-    try {
-      renameSync(portFile, aside);
-    } catch {
-      return; // another starter got there first
-    }
-    try {
-      unlinkSync(aside);
-    } catch {}
-  };
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const outcome = stake();
-    if (outcome === "claimed") {
-      ownPortFile = true;
-      ensurePortIgnored();
-      return;
-    }
-    if (outcome === "failed") return; // already warned
-    const held = portFileValue();
-    if (held === null) {
-      // Not a regular file (e.g. a planted symlink) or unreadable — never write through it.
-      try {
-        if (!lstatSync(portFile).isFile()) {
-          console.log(`warning: .webmcp/.port is not a plain port file — leaving it untouched; ` +
-            `use the port printed below`);
-          return;
-        }
+        unlinkSync(stage);
       } catch {
-        continue; // vanished — retry the claim
+        // Linked, never created, or already gone.
       }
-    } else if (held === port) {
-      // Our own port — a previous life's stale claim. Nothing else can be live
-      // there (we just bound it), so probing would answer our own /healthz and
-      // misread it as another loop. Evict and re-stake.
-    } else if (await liveLoopOn(held)) {
-      console.log(`warning: another interactive loop is already live on port ${held} ` +
-        `(.webmcp/.port stays its); this one serves on a separate port`);
-      return;
     }
-    evictStale(held); // stale: unparseable, or nothing alive behind it
+    const owner = lockOwnerAt(lockFile);
+    if (!owner) {
+      try {
+        if (lstatSync(lockFile).isFile() && !lstatSync(lockFile).isSymbolicLink()) {
+          throw new Error(".webmcp/.server.lock has invalid contents");
+        }
+        throw new Error(".webmcp/.server.lock is not a valid regular lock file");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
+    }
+    const now = Date.now();
+    const expired =
+      owner.lease_expires_at_ms <= now ||
+      owner.lease_expires_at_ms > now + 2 * SERVER_LOCK_LEASE_MS;
+    if (processExists(owner.pid) && !expired) {
+      const candidate = readRun();
+      if (candidate && (await isLive(candidate))) return candidate;
+      await Bun.sleep(50);
+      continue;
+    }
+    await staleLockTestBarrier();
+    const stale = `${lockFile}.stale.${crypto.randomUUID()}`;
+    try {
+      renameSync(lockFile, stale);
+    } catch {
+      await Bun.sleep(10);
+      continue;
+    }
+    // `rename` has no compare-and-swap form. Another starter can replace the lock after
+    // our read but before this rename, so verify the quarantined inode before deleting it.
+    // On a mismatch, put that fresh owner's inode back only if the canonical name is still
+    // free, then abort. Its owner independently revalidates the canonical claim below.
+    if (!sameLockOwner(lockOwnerAt(stale), owner)) {
+      try {
+        linkSync(stale, lockFile);
+        unlinkSync(stale);
+      } catch {
+        // A third claimant already owns the canonical name. Leave the mismatched tombstone
+        // intact rather than deleting a lock we did not observe.
+      }
+      throw new Error("the server lock changed during stale-owner takeover");
+    }
+    unlinkSync(stale);
   }
-  console.log("warning: .webmcp/.port stayed contended; this server did not claim it, " +
-    "so use the port printed below");
+  throw new Error("another Explorer server is starting in this workspace");
 }
 
-function ensurePortIgnored(): void {
+// Deterministic regression-test barrier for the stale-observe/takeover interleaving. It is
+// inert unless a test process explicitly supplies a private temporary directory.
+async function staleLockTestBarrier(): Promise<void> {
+  const directory = process.env.WEBMCP_TEST_STALE_LOCK_BARRIER;
+  if (!directory) return;
+  const observed = join(directory, `observed-${process.pid}`);
+  const release = join(directory, `release-${process.pid}`);
   try {
-    writeFileExclusive(gitignoreFile, ".port*\n");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
-      console.log(`warning: could not write .webmcp/.gitignore (${(err as NodeJS.ErrnoException).code ?? err})`);
-    }
+    writeFileExclusive(observed, "observed");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  const deadline = Date.now() + 5_000;
+  while (readRegularText(release, 32) === null) {
+    if (Date.now() >= deadline) throw new Error("stale-lock test barrier timed out");
+    await Bun.sleep(5);
   }
 }
 
-// Read per request so editing the Explorer page doesn't need a server restart.
+let competingRun: RunFileV1 | null = null;
+try {
+  competingRun = await acquireLock();
+} catch (error) {
+  console.error(`refusing to start: ${(error as Error).message}`);
+  process.exit(1);
+}
+if (competingRun) {
+  console.log(`webmcp-explorer already live on ${explorerUrl(competingRun)}  state: ${stateDir}`);
+  process.exit(0);
+}
+if (readRegularText(lockFile, 4096) !== ownLockText) {
+  console.error("refusing to start: lost the Explorer server lock before startup");
+  process.exit(1);
+}
+
+const identity: RunFileV1 = resume
+  ? (initialRun as RunFileV1)
+  : {
+      version: PROTOCOL_VERSION,
+      run_id: crypto.randomUUID(),
+      capability: crypto.randomUUID(),
+      workspace,
+      port: 1,
+      pid: process.pid,
+      started_at: new Date().toISOString(),
+    };
+
+function portNumberIn(path: string): number | null {
+  const text = readRegularText(path, 16)?.trim();
+  if (!text || !/^[0-9]{1,5}$/.test(text)) return null;
+  const port = Number(text);
+  return port >= 1 && port <= 65535 ? port : null;
+}
+
+function maxRecordedOrder(runId: string): number {
+  const text = readRegularText(feedbackFile);
+  if (text === null) return 0;
+  let max = 0;
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const envelope = parseRecordedEnvelope(JSON.parse(line));
+      if (envelope?.run_id === runId && envelope.order > max) max = envelope.order;
+    } catch {
+      // Legacy records, fragments, and malformed foreign input never allocate order.
+    }
+  }
+  return max;
+}
+
+let lastOrder = maxRecordedOrder(identity.run_id);
+
+// Read per request so an Explorer-page edit does not need a server restart.
 function page(): string {
   try {
     return readFileSync(join(import.meta.dir, "explorer.html"), "utf8");
   } catch {
-    return `<!doctype html><meta charset="utf-8"><title>WebMCP Explorer</title>
-<h1>WebMCP Explorer (placeholder)</h1><pre id="s">connecting…</pre><script>
-new WebSocket("ws://" + location.host + "/ws?role=page").onmessage =
-  (e) => { s.textContent = JSON.stringify(JSON.parse(e.data), null, 2); };
-</script>`;
+    return "<!doctype html><meta charset=utf-8><title>WebMCP Explorer</title><h1>Explorer unavailable</h1>";
   }
-}
-
-// Append one event line; true only if it actually landed. O_NOFOLLOW: never write through a
-// symlink planted in the tracked state folder. A failure is reported, never fatal.
-function recordEvent(line: string): boolean {
-  if (!stateDirIsReal()) {
-    console.log("warning: could not record the event (state folder is missing or is a symlink)");
-    return false;
-  }
-  let fd: number | undefined;
-  try {
-    fd = openSync(join(stateDir, "_feedback.ndjson"),
-      constants.O_APPEND | constants.O_CREAT | constants.O_WRONLY | constants.O_NOFOLLOW, 0o644);
-    // Append-only and self-isolating: one write of "\n" + record + "\n". Two loops may share
-    // this trail, and no inspect-then-append can be made atomic across processes — a leading
-    // newline needs neither, terminating whatever fragment anyone left. Blank lines are normal.
-    const buf = Buffer.from("\n" + line + "\n", "utf8");
-    const written = writeSync(fd, buf, 0, buf.length);
-    if (written !== buf.length) {
-      console.log(`warning: only ${written}/${buf.length} bytes of the event reached _feedback.ndjson; ` +
-        "it was dropped, and the next append isolates the fragment");
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.log(`warning: could not record the event (${(err as NodeJS.ErrnoException).code ?? err})`);
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-  }
-  return false;
 }
 
 function stateFiles(): Record<string, string> {
   const files: Record<string, string> = Object.create(null);
   let names: string[] = [];
   try {
-    if (stateDirIsReal()) names = readdirSync(stateDir); // gone mid-loop is a recovery case
-  } catch {}
+    if (stateDirIsReal()) names = readdirSync(stateDir);
+  } catch {
+    return files;
+  }
   for (const name of names) {
-    if (name.startsWith(".")) continue; // dot-files are runtime plumbing, not state
-    let fd: number | undefined;
-    try {
-      // O_NOFOLLOW: a symlink planted in the state folder must not leak what it points at,
-      // and there is no window between the check and the read. Directories fail EISDIR.
-      fd = openSync(join(stateDir, name), constants.O_RDONLY | constants.O_NOFOLLOW);
-      files[name] = readFileSync(fd, "utf8");
-    } catch {
-    } finally {
-      if (fd !== undefined) closeSync(fd);
-    }
+    if (name.startsWith(".")) continue;
+    const text = readRegularText(join(stateDir, name));
+    if (text !== null) files[name] = text;
   }
   return files;
 }
 
 const snapshot = () => JSON.stringify({ type: "snapshot", files: stateFiles() });
-
 let publishedFiles = stateFiles();
 let debounce: ReturnType<typeof setTimeout> | undefined;
+let server: ReturnType<typeof startServer>;
+let watcher: ReturnType<typeof watch> | undefined;
+let reconciliation: ReturnType<typeof setInterval> | undefined;
+let lockRenewal: ReturnType<typeof setInterval> | undefined;
 
 function publishChanges(): void {
   clearTimeout(debounce);
@@ -295,46 +414,61 @@ function publishChanges(): void {
   publishedFiles = next;
 }
 
-function releasePortFile(): void {
-  // Only the claimant releases .port, and only while it still holds its own port.
-  if (ownPortFile && portFileValue() === server.port) {
-    try {
-      unlinkSync(portFile);
-    } catch {}
-  }
+function authorized(url: URL): boolean {
+  return (
+    url.searchParams.get("capability") === identity.capability &&
+    url.searchParams.get("run_id") === identity.run_id
+  );
 }
 
-const preferredPort = await reusablePort();
+function sameOrigin(req: Request, port: number): boolean {
+  const origin = req.headers.get("origin");
+  return !origin || origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`;
+}
+
+function sendError(
+  ws: ServerWebSocket<{ role: "page" | "claude" }>,
+  message: string,
+  requestId?: string,
+): void {
+  ws.send(JSON.stringify({ type: "error", ...(requestId ? { request_id: requestId } : {}), message }));
+}
+
+function journalByteLimit(): number {
+  const testLimit = process.env.WEBMCP_TEST_JOURNAL_MAX_BYTES;
+  if (testLimit && /^[1-9][0-9]{0,7}$/.test(testLimit)) {
+    return Math.min(Number(testLimit), MAX_JOURNAL_BYTES);
+  }
+  return MAX_JOURNAL_BYTES;
+}
+
 function startServer(port: number) {
   return Bun.serve<{ role: "page" | "claude" }>({
-    port, // the previous run's port when free (NEK-735), else 0 and the OS picks
+    port,
     hostname: "127.0.0.1",
     fetch(req, srv) {
       const url = new URL(req.url);
-      // A browser always sends Origin, so any page the user visits could otherwise read the
-      // whole plan, forge submit/approve, or kill the loop. Non-browser clients (the Monitor,
-      // the robot, curl) send none.
-      const origin = req.headers.get("origin");
-      const foreign = !!origin && origin !== `http://localhost:${srv.port}` &&
-        origin !== `http://127.0.0.1:${srv.port}`;
-      if (foreign && (url.pathname === "/ws" || url.pathname === "/shutdown")) {
-        console.log(`warning: rejected ${url.pathname} from origin ${origin}`);
-        return new Response("forbidden origin", { status: 403 });
+      if (url.pathname === "/healthz") {
+        if (!authorized(url)) return new Response("not found", { status: 404 });
+        return Response.json(
+          { service: SERVICE, version: PROTOCOL_VERSION, run_id: identity.run_id, workspace },
+          { headers: { "cache-control": "no-store" } },
+        );
       }
       if (url.pathname === "/ws") {
+        if (!sameOrigin(req, srv.port)) return new Response("forbidden origin", { status: 403 });
+        if (!authorized(url)) return new Response("forbidden", { status: 403 });
         const role = url.searchParams.get("role");
-        // Exact roles only — a typo must fail loudly, not silently join the page role.
         if (role !== "page" && role !== "claude") return new Response("unknown role", { status: 400 });
         if (srv.upgrade(req, { data: { role } })) return;
         return new Response("upgrade failed", { status: 400 });
       }
-      if (url.pathname === "/healthz") return new Response(HEALTH);
-      if (url.pathname === "/shutdown" && req.method === "POST") {
-        // Flush the final file update (e.g. phase "done") before dying, else the last write
-        // races the debounced watcher publish.
+      if (url.pathname === "/shutdown") {
+        if (!sameOrigin(req, srv.port)) return new Response("forbidden origin", { status: 403 });
+        if (!authorized(url)) return new Response("forbidden", { status: 403 });
+        if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
         publishChanges();
-        releasePortFile();
-        setTimeout(() => process.exit(0), 300);
+        setTimeout(cleanExit, 100);
         return new Response("bye");
       }
       return new Response(page(), { headers: { "content-type": "text/html; charset=utf-8" } });
@@ -346,30 +480,66 @@ function startServer(port: number) {
         console.log(`ws open: ${ws.data.role}`);
       },
       message(ws, raw) {
-        if (ws.data.role !== "page") return; // the Explorer is the only event source
+        if (ws.data.role !== "page") return;
         const bytes = typeof raw === "string" ? Buffer.byteLength(raw, "utf8") : raw.byteLength;
-        if (bytes > MAX_EVENT_BYTES) {
-          ws.send(JSON.stringify({ type: "error", message: "That message is too large. Keep it under 64 KB." }));
+        if (bytes > MAX_REQUEST_BYTES) {
+          sendError(ws, "That request is too large. Keep it under 64 KB.");
           return;
         }
         let parsed: unknown;
         try {
           parsed = JSON.parse(String(raw));
         } catch {
+          sendError(ws, "Request must be valid JSON.");
           return;
         }
-        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return;
-        const event = parsed as Record<string, unknown>;
-        event.ts = new Date().toISOString();
-        const line = JSON.stringify(event);
-        // The state folder is the approval trail (ADR-0003): never act on an event that
-        // could not be written down — an unrecorded approve would leave no record at all.
-        if (!recordEvent(line)) {
-          console.log(`warning: dropped ${String(event.type)} — it could not be recorded, so it was not relayed`);
+        const checked = validateRequest(parsed);
+        if (checked.ok === false) {
+          sendError(ws, checked.message, checked.request_id);
           return;
         }
-        // Only actionable events wake Claude — picks are recorded but need no turn.
-        if (ACTIONABLE.has(String(event.type))) server.publish("claude", line);
+        if (lastOrder >= Number.MAX_SAFE_INTEGER) {
+          sendError(ws, "This run has exhausted its event order.", checked.value.request_id);
+          return;
+        }
+        const envelope: RecordedEnvelope = {
+          event_id: crypto.randomUUID(),
+          run_id: identity.run_id,
+          order: lastOrder + 1,
+          type: checked.value.type,
+          ts: new Date().toISOString(),
+          payload: checked.value.payload,
+        };
+        const line = JSON.stringify(envelope);
+        if (Buffer.byteLength(line, "utf8") > MAX_JOURNAL_LINE_BYTES) {
+          sendError(ws, "The event is too large to record.", checked.value.request_id);
+          return;
+        }
+        try {
+          if (!stateDirIsReal()) throw new Error("state folder is missing or is a symlink");
+          appendDurable(feedbackFile, envelope, journalByteLimit());
+        } catch (error) {
+          console.log(`warning: could not record ${envelope.type} (${(error as Error).message})`);
+          sendError(
+            ws,
+            error instanceof AppendLimitError
+              ? "This run's feedback journal is full. Archive or rotate .webmcp/_feedback.ndjson, then start a new run."
+              : "The event could not be recorded.",
+            checked.value.request_id,
+          );
+          return;
+        }
+        lastOrder = envelope.order;
+        ws.send(
+          JSON.stringify({
+            type: "recorded",
+            request_id: checked.value.request_id,
+            event_id: envelope.event_id,
+            run_id: envelope.run_id,
+            order: envelope.order,
+          }),
+        );
+        if (ACTIONABLE.has(envelope.type)) server.publish("claude", line);
         console.log(`event: ${line}`);
       },
       close(ws) {
@@ -378,29 +548,184 @@ function startServer(port: number) {
     },
   });
 }
-let server: ReturnType<typeof startServer>;
+
+const preferredPort = resume
+  ? identity.port
+  : (portNumberIn(portFile) ?? portNumberIn(lastPortFile) ?? 0);
 try {
   server = startServer(preferredPort);
 } catch {
-  server = startServer(0); // taken between the probe and the bind — let the OS pick
+  server = startServer(0);
 }
-recordLastPort(server.port);
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    releasePortFile();
-    process.exit(0);
+const liveRun: RunFileV1 = {
+  ...identity,
+  port: server.port,
+  pid: process.pid,
+};
+
+function writeAtomic(path: string, text: string): void {
+  if (!stateDirIsReal()) throw new Error("state folder is missing or is a symlink");
+  try {
+    if (lstatSync(path).isSymbolicLink()) throw new Error(`${path} is a symlink`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}`;
+  try {
+    writeFileExclusive(temporary, text);
+    renameSync(temporary, path);
+  } finally {
+    try {
+      unlinkSync(temporary);
+    } catch {
+      // Renamed or never created.
+    }
+  }
+}
+
+function ensureRuntimeIgnored(): void {
+  const required = [".port*", ".run.json*", ".server.lock*", ".ack.lock*"];
+  let existing = readRegularText(gitignoreFile, 64 * 1024) ?? "";
+  const lines = new Set(existing.split("\n"));
+  const missing = required.filter((line) => !lines.has(line));
+  if (missing.length === 0) return;
+  if (existing && !existing.endsWith("\n")) existing += "\n";
+  writeAtomic(gitignoreFile, `${existing}${missing.join("\n")}\n`);
+}
+
+function publishPort(path: string, port: number): void {
+  try {
+    if (lstatSync(path).isSymbolicLink() || !lstatSync(path).isFile()) {
+      console.log(`warning: ${path} is not a regular file; leaving it untouched`);
+      return;
+    }
+  } catch {
+    // Absent is expected.
+  }
+  writeAtomic(path, String(port));
+}
+
+try {
+  if (readRegularText(lockFile, 4096) !== ownLockText) {
+    throw new Error("lost the Explorer server lock before runtime publication");
+  }
+  ensureRuntimeIgnored();
+  writeAtomic(runFile, `${JSON.stringify(liveRun)}\n`);
+  publishPort(portFile, server.port);
+  publishPort(lastPortFile, server.port);
+} catch (error) {
+  server.stop(true);
+  console.error(`refusing to start: could not publish runtime state (${(error as Error).message})`);
+  releaseLock();
+  process.exit(1);
+}
+
+function runtimeIsOurs(): boolean {
+  const current = readRun();
+  return (
+    current?.run_id === liveRun.run_id &&
+    current.capability === liveRun.capability &&
+    current.pid === process.pid
+  );
+}
+
+function releaseLock(): void {
+  if (!ownLock || readRegularText(lockFile, 4096) !== ownLockText) return;
+  try {
+    unlinkSync(lockFile);
+  } catch {
+    // Best-effort cleanup. A crash deliberately leaves this claim behind.
+  }
+  ownLock = false;
+}
+
+function renewServerLock(): boolean {
+  if (!ownLock || readRegularText(lockFile, 4096) !== ownLockText) return false;
+  const renewedText = JSON.stringify({
+    pid: process.pid,
+    nonce: lockNonce,
+    lease_expires_at_ms: Date.now() + SERVER_LOCK_LEASE_MS,
   });
+  const stage = `${lockFile}.renew.${process.pid}.${crypto.randomUUID()}`;
+  const tombstone = `${lockFile}.renewing.${crypto.randomUUID()}`;
+  let quarantinedOurs = false;
+  try {
+    writeFileExclusive(stage, renewedText);
+    renameSync(lockFile, tombstone);
+    if (readRegularText(tombstone, 4096) !== ownLockText) {
+      try {
+        linkSync(tombstone, lockFile);
+        unlinkSync(tombstone);
+      } catch {
+        // Another owner has the canonical name. Preserve the mismatched tombstone.
+      }
+      return false;
+    }
+    quarantinedOurs = true;
+    try {
+      linkSync(stage, lockFile);
+    } catch {
+      return false;
+    }
+    ownLockText = renewedText;
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try {
+      unlinkSync(stage);
+    } catch {}
+    if (quarantinedOurs) {
+      try {
+        unlinkSync(tombstone);
+      } catch {}
+    }
+  }
 }
 
-const watcher = watch(stateDir, () => {
+function clearLiveness(): void {
+  if (runtimeIsOurs()) {
+    try {
+      unlinkSync(runFile);
+    } catch {}
+  }
+  if (portNumberIn(portFile) === liveRun.port) {
+    try {
+      unlinkSync(portFile);
+    } catch {}
+  }
+  releaseLock();
+}
+
+let shuttingDown = false;
+function cleanExit(): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (reconciliation) clearInterval(reconciliation);
+  if (lockRenewal) clearInterval(lockRenewal);
+  clearTimeout(debounce);
+  watcher?.close();
+  server.stop(true);
+  clearLiveness();
+  process.exit(0);
+}
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, cleanExit);
+
+watcher = watch(stateDir, () => {
   clearTimeout(debounce);
   debounce = setTimeout(publishChanges, 120);
 });
-// The state folder disappearing is a recovery case Claude handles, not a server crash.
-watcher.on("error", (err) => console.log(`warning: state folder watch stopped (${err.message})`));
+watcher.on("error", (error) => console.log(`warning: state folder watch stopped (${error.message})`));
 
-scavengeStagedClaims();
-await claimPortFile(server.port);
+// Some platforms coalesce or omit rename events. Re-read by content every 250 ms so an
+// atomic replace still reaches the page exactly once.
+reconciliation = setInterval(publishChanges, 250);
+lockRenewal = setInterval(() => {
+  if (renewServerLock()) return;
+  console.log("warning: lost the Explorer server lock during lease renewal; shutting down");
+  cleanExit();
+}, SERVER_LOCK_RENEW_MS);
 
-console.log(`webmcp-explorer on http://localhost:${server.port}  state: ${stateDir}`);
+console.log(`webmcp-explorer on ${explorerUrl(liveRun)}  state: ${stateDir}`);

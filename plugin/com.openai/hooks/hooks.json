@@ -1,0 +1,33 @@
+{
+  "description": "Deliver authenticated WebMCP Explorer actions to Codex.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v bun >/dev/null 2>&1; then bun \"${PLUGIN_ROOT}/com.openai/hooks/webmcp-feedback.ts\" pre-tool-use; fi",
+            "commandWindows": "where bun >NUL 2>NUL || exit /b 0 & bun \"%PLUGIN_ROOT%\\com.openai\\hooks\\webmcp-feedback.ts\" pre-tool-use",
+            "timeout": 10,
+            "additionalContextLimit": 0,
+            "statusMessage": "Checking WebMCP Explorer feedback"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v bun >/dev/null 2>&1; then bun \"${PLUGIN_ROOT}/com.openai/hooks/webmcp-feedback.ts\" stop; fi",
+            "commandWindows": "where bun >NUL 2>NUL || exit /b 0 & bun \"%PLUGIN_ROOT%\\com.openai\\hooks\\webmcp-feedback.ts\" stop",
+            "timeout": 35,
+            "statusMessage": "Waiting briefly for WebMCP Explorer feedback"
+          }
+        ]
+      }
+    ]
+  }
+}
