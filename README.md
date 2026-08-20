@@ -34,7 +34,7 @@ Build the skills-only ZIP accepted by the OpenAI Platform plugin uploader:
 python3 scripts/package-openai-skills.py
 ```
 
-The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest and both skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
+The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest, brand assets, and both skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
 
 ## Prerequisites
 

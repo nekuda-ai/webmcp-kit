@@ -17,6 +17,8 @@
     "category": "Developer Tools",
     "capabilities": ["Add WebMCP tools", "Verify WebMCP tools"],
     "websiteURL": "https://github.com/nekuda-ai/webmcp-kit",
+    "composerIcon": "./assets/nekuda-logo.png",
+    "logo": "./assets/nekuda-logo.png",
     "defaultPrompt": [
       "Make this web app agent-ready with WebMCP tools.",
       "Verify this site's WebMCP tools in a browser."

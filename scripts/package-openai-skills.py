@@ -21,6 +21,7 @@ output = root / "dist" / f"{manifest['name']}-{manifest['version']}.zip"
 with tempfile.TemporaryDirectory() as temporary:
     bundle = Path(temporary) / manifest["name"]
     shutil.copytree(plugin / "skills", bundle / "skills")
+    shutil.copytree(plugin / "assets", bundle / "assets")
     manifest_dir = bundle / ".codex-plugin"
     manifest_dir.mkdir()
     (manifest_dir / "plugin.json").write_text(json.dumps(manifest, indent=2) + "\n")
