@@ -8,5 +8,20 @@
   "license": "MIT",
   "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"],
   "skills": "./skills/",
-  "hooks": "./com.openai/hooks/hooks.json"
+  "hooks": "./com.openai/hooks/hooks.json",
+  "interface": {
+    "displayName": "WebMCP Kit",
+    "shortDescription": "Make web apps agent-ready",
+    "longDescription": "Add WebMCP tools to a website or web app through a guided workflow that analyzes the codebase, proposes a tool plan for approval, implements the tools with @nekuda/webmcp-sdk, and verifies them in a real browser.",
+    "developerName": "nekuda",
+    "category": "Developer Tools",
+    "capabilities": ["Add WebMCP tools", "Verify WebMCP tools"],
+    "websiteURL": "https://github.com/nekuda-ai/webmcp-kit",
+    "composerIcon": "./assets/nekuda-logo.png",
+    "logo": "./assets/nekuda-logo.png",
+    "defaultPrompt": [
+      "Make this web app agent-ready with WebMCP tools.",
+      "Verify this site's WebMCP tools in a browser."
+    ]
+  }
 }

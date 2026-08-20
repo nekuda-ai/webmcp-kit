@@ -26,6 +26,16 @@ Or run `/plugins` inside Codex and install it from the browser there.
 
 On Codex, installing also registers the plugin's lifecycle hooks (`PreToolUse`/`Stop`) — they only ferry feedback from the live review UI back to the agent, and you can inspect them anytime with `/hooks`.
 
+## Package for the OpenAI Platform
+
+Build the skills-only ZIP accepted by the OpenAI Platform plugin uploader:
+
+```sh
+python3 scripts/package-openai-skills.py
+```
+
+The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest, brand assets, and both skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
+
 ## Prerequisites
 
 - [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex)
