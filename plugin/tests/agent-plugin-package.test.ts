@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const pluginRoot = join(import.meta.dir, "..");
@@ -83,4 +90,90 @@ test("the Unix hook command is a quiet no-op when Bun is unavailable", async () 
   ]);
 
   expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
+});
+
+function markdownFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return markdownFiles(path);
+    return path.endsWith(".md") ? [path] : [];
+  });
+}
+
+test("skill CLI calls resolve through the installed plugin entry", () => {
+  const skills = join(pluginRoot, "skills");
+  const connect = readFileSync(join(skills, "implement", "references", "connect.md"), "utf8");
+  const entry = readFileSync(join(pluginRoot, "scripts", "webmcp.sh"), "utf8");
+
+  expect(connect).toContain('"${CLAUDE_PLUGIN_ROOT}/scripts/webmcp.sh"');
+  expect(connect).toContain('"${PLUGIN_ROOT}/scripts/webmcp.sh"');
+  expect(entry).toContain("CLAUDE_PLUGIN_ROOT");
+  expect(entry).toContain("PLUGIN_ROOT");
+  expect(entry).not.toContain("WEBMCP_CLI_TEST_WRAPPER");
+  for (const path of markdownFiles(skills)) {
+    expect(readFileSync(path, "utf8")).not.toMatch(/\bwebmcp\s+(?:login|connect|status)\b/);
+  }
+});
+
+test("Connect reconciles the key and environment endpoint across every entry batch", () => {
+  const connect = readFileSync(
+    join(pluginRoot, "skills", "implement", "references", "connect.md"),
+    "utf8",
+  );
+
+  expect(connect).toContain("Set `WEBMCP_API_BASE` to the environment's API; everything else follows.");
+  expect(connect).toContain("defaults to `https://api.agentlane.com`");
+  expect(connect).toContain("in the agent conversation for a human chat-only run");
+  expect(connect).toContain("In every existing `registerTools` batch");
+  expect(connect).toContain('tracking: { apiKey: "<api_key.value>", endpoint: "<ingest_url>" }');
+  expect(connect).toContain("Otherwise remove any existing `tracking.endpoint`");
+  expect(connect).toContain("never retain a stale endpoint");
+  expect(connect).toContain("`tracking_endpoint_matches: true`");
+});
+
+test.each([
+  ["Claude Code", { CLAUDE_PLUGIN_ROOT: pluginRoot, PLUGIN_ROOT: "/wrong-plugin-root" }],
+  ["Codex", { CLAUDE_PLUGIN_ROOT: "", PLUGIN_ROOT: pluginRoot }],
+])("the CLI entry runs --help through Bun from a scratch directory for %s", async (_, roots) => {
+  const scratch = mkdtempSync(join(tmpdir(), "webmcp-plugin-entry-"));
+  try {
+    const child = Bun.spawn([join(pluginRoot, "scripts", "webmcp.sh"), "--help"], {
+      cwd: scratch,
+      env: { ...process.env, ...roots },
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(code).toBe(0);
+    expect(stdout).toContain("Usage:\n  webmcp login [--json]");
+    expect(stderr).toBe("");
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("the CLI entry gives the exact Bun install fix when Bun is unavailable", async () => {
+  const process = Bun.spawn(["/bin/sh", join(pluginRoot, "scripts", "webmcp.sh"), "--help"], {
+    env: { PATH: "/webmcp-test-no-bun", PLUGIN_ROOT: pluginRoot },
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [code, stdout, stderr] = await Promise.all([
+    process.exited,
+    new Response(process.stdout).text(),
+    new Response(process.stderr).text(),
+  ]);
+
+  expect({ code, stdout, stderr }).toEqual({
+    code: 127,
+    stdout: "",
+    stderr: "webmcp: Bun is required. Install Bun, then retry.\n",
+  });
 });

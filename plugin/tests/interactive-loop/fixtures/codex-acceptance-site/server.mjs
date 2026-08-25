@@ -1,11 +1,11 @@
 import { createServer } from "node:http";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = join(ROOT, "public");
+const PUBLIC_DIR = process.env.PUBLIC_DIR || join(ROOT, "public");
 const STATE_FILE = process.env.STATE_FILE || join(ROOT, "data", "state.json");
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = parsePort(process.env.PORT ?? "4173");
@@ -170,21 +170,35 @@ async function requestJson(request) {
 }
 
 async function serveStatic(pathname, response) {
-  const routes = new Map([
-    ["/", "index.html"],
-    ["/app.js", "app.js"],
-    ["/styles.css", "styles.css"],
-  ]);
-  const filename = routes.get(pathname);
-  if (!filename) return false;
-  const body = await readFile(join(PUBLIC_DIR, filename));
-  const type = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" }[extname(filename)];
+  let filename;
+  try {
+    filename = pathname === "/" ? "index.html" : decodeURIComponent(pathname).replace(/^\/+/, "");
+  } catch {
+    throw Object.assign(new Error("URL path has malformed percent encoding"), { status: 400 });
+  }
+  const path = resolve(PUBLIC_DIR, filename);
+  const publicPath = relative(PUBLIC_DIR, path);
+  if (!publicPath || publicPath.startsWith("..") || isAbsolute(publicPath)) return false;
+  let body;
+  try {
+    body = await readFile(path);
+  } catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "EISDIR") return false;
+    throw error;
+  }
+  const type = {
+    ".css": "text/css",
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".json": "application/json",
+    ".mjs": "text/javascript",
+  }[extname(filename)] || "application/octet-stream";
   response.writeHead(200, {
     "content-type": `${type}; charset=utf-8`,
     "content-length": body.length,
     "cache-control": "no-cache",
     "x-content-type-options": "nosniff",
-    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'",
+    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https://ingest.agentlane.dev; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'",
   });
   response.end(body);
   return true;

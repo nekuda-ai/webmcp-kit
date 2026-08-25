@@ -12,7 +12,7 @@ import {
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import {
   MAX_JOURNAL_BYTES,
   appendDurable,
@@ -22,6 +22,7 @@ import {
   parseRecordedEnvelope,
   parseRunFile,
   readRegularText,
+  type RecordedEnvelope,
   type RunFileV1,
 } from "./protocol";
 
@@ -49,8 +50,10 @@ const stateDir = join(workspace, ".webmcp");
 const runFile = join(stateDir, ".run.json");
 const feedbackFile = join(stateDir, "_feedback.ndjson");
 const ackFile = join(stateDir, "_ack.ndjson");
+const statusFile = join(stateDir, "_status.ndjson");
 const lockFile = join(stateDir, ".ack.lock");
 const ACK_LOCK_MAX_AGE_MS = 5 * 60 * 1_000;
+const MAX_REVIEW_COPY_BYTES = 64 * 1024;
 const lockNonce = crypto.randomUUID();
 const ownLockText = JSON.stringify({
   pid: process.pid,
@@ -196,19 +199,155 @@ function currentRun(): RunFileV1 | null {
   }
 }
 
-function eventExists(): boolean {
+function canonicalEvent(): RecordedEnvelope | null {
   const text = readRegularText(feedbackFile);
-  if (text === null) return false;
+  if (text === null) return null;
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     try {
       const envelope = parseRecordedEnvelope(JSON.parse(line));
-      if (envelope?.run_id === runId && envelope.event_id === eventId) return true;
+      if (envelope?.run_id === runId && envelope.event_id === eventId) return envelope;
     } catch {
       // Legacy, malformed, and partial lines can never authorize an acknowledgement.
     }
   }
-  return false;
+  return null;
+}
+
+function submitBuildStarted(event: RecordedEnvelope): boolean {
+  if (event.type !== "submit") return true;
+  const status = readRegularText(statusFile);
+  if (status === null) return false;
+  const entries: Array<Record<string, unknown>> = [];
+  for (const line of status.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const value = JSON.parse(line) as unknown;
+      if (isPlainObject(value)) entries.push(value);
+    } catch {
+      // Malformed lines can never prove the submit effect.
+    }
+  }
+  if (!entries.some((entry) => entry.phase === "build")) return false;
+  const firstPick = (event.payload as { picks: Array<{ suggestion: string }> }).picks[0];
+  return (
+    !firstPick ||
+    entries.some(
+      (entry) =>
+        entry.suggestion === firstPick.suggestion &&
+        entry.step === "code" &&
+        entry.state === "start",
+    )
+  );
+}
+
+function feedbackSourceMatchesReview(event: RecordedEnvelope): boolean {
+  if (event.type !== "feedback") return true;
+  const suggestion = (event.payload as { suggestion: string | null }).suggestion;
+  if (suggestion === null) return true;
+  const planText = readRegularText(join(stateDir, "plan.json"), MAX_REVIEW_COPY_BYTES);
+  if (planText === null) return false;
+  let sourceModule: string | null = null;
+  try {
+    const value = JSON.parse(planText) as unknown;
+    if (!isPlainObject(value) || !Array.isArray(value.suggestions)) return false;
+    const planned = value.suggestions.find(
+      (item) => isPlainObject(item) && item.id === suggestion,
+    );
+    if (
+      !isPlainObject(planned) ||
+      typeof planned.source_module !== "string" ||
+      planned.source_module.length === 0 ||
+      planned.source_module.includes("\\")
+    ) {
+      return false;
+    }
+    sourceModule = planned.source_module;
+  } catch {
+    return false;
+  }
+
+  if (sourceModule === null) return false;
+  const sourcePath = resolve(workspace, sourceModule);
+  if (sourcePath === workspace || !sourcePath.startsWith(`${workspace}${sep}`)) return false;
+  try {
+    if (realpathSync(sourcePath) !== sourcePath) return false;
+  } catch {
+    return false;
+  }
+  const reviewPath = resolve(stateDir, `${suggestion}.code.md`);
+  if (!reviewPath.startsWith(`${stateDir}${sep}`)) return false;
+  const source = readRegularText(sourcePath, MAX_REVIEW_COPY_BYTES);
+  const review = readRegularText(reviewPath, MAX_REVIEW_COPY_BYTES);
+  return source !== null && source === review;
+}
+
+function importSpecifiers(source: string): string[] {
+  const specifiers: string[] = [];
+  for (const pattern of [
+    /\b(?:import|export)\s+(?:[^"'()]*?\s+from\s*)?["']([^"']+)["']/g,
+    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+  ]) {
+    for (const match of source.matchAll(pattern)) {
+      if (match[1]) specifiers.push(match[1]);
+    }
+  }
+  return specifiers;
+}
+
+function approvalBrowserDeliveryIssue(event: RecordedEnvelope): string | null {
+  if (event.type !== "approve") return null;
+  const planText = readRegularText(join(stateDir, "plan.json"), MAX_REVIEW_COPY_BYTES);
+  if (planText === null) return null;
+  let entryModule: string;
+  try {
+    const value = JSON.parse(planText) as unknown;
+    if (!isPlainObject(value) || typeof value.entry_module !== "string") return null;
+    entryModule = value.entry_module;
+  } catch {
+    return null;
+  }
+  if (entryModule.includes("\\") || !/\.(?:m?js)$/i.test(entryModule)) return null;
+  const segments = entryModule.split("/");
+  const publicIndex = segments.lastIndexOf("public");
+  if (publicIndex < 0) return null;
+  const publicRoot = resolve(workspace, ...segments.slice(0, publicIndex + 1));
+  const entryPath = resolve(workspace, entryModule);
+  if (entryPath === publicRoot || !entryPath.startsWith(`${publicRoot}${sep}`)) {
+    return "planned public entry module escapes its public root";
+  }
+
+  const pending = [entryPath];
+  const visited = new Set<string>();
+  while (pending.length > 0 && visited.size < 128) {
+    const path = pending.pop()!;
+    if (visited.has(path)) continue;
+    visited.add(path);
+    try {
+      if (realpathSync(path) !== path) return "planned public module graph contains a symlink";
+    } catch {
+      return `planned public module is not a readable real file: ${relative(workspace, path)}`;
+    }
+    const source = readRegularText(path, MAX_REVIEW_COPY_BYTES);
+    if (source === null) {
+      return `planned public module is not a bounded regular file: ${relative(workspace, path)}`;
+    }
+    for (const specifier of importSpecifiers(source)) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(specifier) || specifier.startsWith("//")) continue;
+      if (!specifier.startsWith(".") && !specifier.startsWith("/")) {
+        return `browser-unresolvable bare import ${JSON.stringify(specifier)} in ${relative(workspace, path)}`;
+      }
+      const clean = specifier.split(/[?#]/, 1)[0] ?? "";
+      const imported = specifier.startsWith("/")
+        ? resolve(publicRoot, clean.replace(/^\/+/, ""))
+        : resolve(dirname(path), clean);
+      if (imported !== publicRoot && !imported.startsWith(`${publicRoot}${sep}`)) {
+        return `planned public module import escapes its public root: ${specifier}`;
+      }
+      if (/\.(?:m?js)$/i.test(imported)) pending.push(imported);
+    }
+  }
+  return null;
 }
 
 function acknowledgementExists(): boolean {
@@ -246,8 +385,23 @@ async function main(): Promise<void> {
     if (!stateDirIsReal() || !currentRun()) {
       throw new Error(".webmcp/.run.json is no longer the matching current run");
     }
-    if (!eventExists()) {
+    const event = canonicalEvent();
+    if (!event) {
       throw new Error("event_id is not a canonical event in the matching current run");
+    }
+    if (!submitBuildStarted(event)) {
+      throw new Error("submit effect has no durable phase-build and first code-start records");
+    }
+    if (!feedbackSourceMatchesReview(event)) {
+      throw new Error(
+        "feedback effect must update the suggestion's exact plan.json source_module first, then mechanically regenerate its matching review copy",
+      );
+    }
+    const browserDeliveryIssue = approvalBrowserDeliveryIssue(event);
+    if (browserDeliveryIssue) {
+      throw new Error(
+        `approval effect is not browser-deliverable: ${browserDeliveryIssue}; vendor the SDK behind a relative browser URL or add a matching import map, then cold-restart verification before acknowledging`,
+      );
     }
     if (acknowledgementExists()) return;
     if (!currentRun()) throw new Error("the current run changed before acknowledgement");

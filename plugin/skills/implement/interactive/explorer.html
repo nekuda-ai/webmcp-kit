@@ -12,7 +12,7 @@
      the page script: no inline handlers, no eval, nothing loadable but pinned driver.js.
      The two script hashes and the style hash cover this file's inline blocks —
      regenerate them if you edit any inline style or script block. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-bBuji4Op7Um3nZFZvOEfWgW+Q8XfrOgHEnlE1SOBy24=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-dk+SWEFLmIIv8gWO+svmiu+N9BDpC3GBHJWj44TgZGk=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-H2PZefWdV9cbGszOn24X2sV28/4/Rm2qhm0lOc4x+o8=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-tnj2s0oGvef1ePwh/wYEgQtOcqXzLdXod3iB2D+2+Qo=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css" integrity="sha384-XUGWln86d3kDvw/W1Qbii8QQyeWs2LcFYfGhYrmSZ0ZiXxowttKpfdhPdLE+WMFx" crossorigin="anonymous">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("webmcp-explorer-theme")||"light"}catch(e){}</script>
 <style>:root{--bg:#f6f7f6;--panel:#fff;--ink:#222624;--muted:#737975;--line:#dfe3e0;--blue:#279cff;--blue-bg:#eef8ff;--green:#41865f;--green-bg:#eef6f1;--gold:#987627;--gold-bg:#fbf6e8;--red:#b55545;--red-bg:#fff1ee;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
@@ -57,7 +57,7 @@ button, textarea{font:inherit;color:inherit}
    min disables the grid item's own min-content floor, so a squeezed track drags a node
    narrower than its nowrap label and the text spills through the border. The old px floors
    were tuned for the 11px .node font and never revisited when it went to 18px. */
-.map{display:grid;grid-template-columns:max-content max-content minmax(225px,1fr);gap:20px;align-items:start}
+.map{display:grid;grid-template-columns:max-content minmax(225px,1fr);gap:20px;align-items:start}
 .node{position:relative;min-height:44px;display:flex;align-items:center;gap:8px;margin-top:9px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:600 11px var(--mono);white-space:nowrap}
 .page{border-color:#6ebcff;background:#fbfdff}
 .page-count{margin-left:auto;padding:4px 6px;border-radius:99px;background:#f0f2f1;color:var(--muted);font:10px var(--mono)}
@@ -68,10 +68,7 @@ button, textarea{font:inherit;color:inherit}
 .tool.off{opacity:.55;background:#f8f8f8}
 .tool.off .tool-name{text-decoration:line-through}
 .tool-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px var(--mono)}
-.outline{display:none;flex-direction:column;gap:8px}
 .tree-scroll.outline-mode .map{display:none}
-.tree-scroll.outline-mode .outline{display:flex}
-.outline .tool{min-height:58px}
 .detail{display:grid;grid-template-rows:82px 44px minmax(0,1fr)}
 .detail-head{display:block;padding:15px 18px;border-bottom:1px solid var(--line)}
 .detail-head-top{display:flex;align-items:center;gap:8px}
@@ -116,7 +113,7 @@ pre.annotatable:hover{background:#171b19}
 .controls>.eyebrow{padding-left:6px}
 .seg{justify-self:center}
 .tree-scroll{padding:26px 28px}
-.map{position:relative;grid-template-columns:max-content max-content minmax(268px,300px);column-gap:86px;justify-content:center}
+.map{position:relative;grid-template-columns:max-content minmax(268px,300px);column-gap:86px;justify-content:center}
 .node{min-height:44px;margin-top:10px;padding:0 14px;border-radius:11px}
 .tool{min-height:44px}
 .tool .tool-name{flex:0 1 auto;min-width:0}
@@ -128,12 +125,7 @@ pre.annotatable:hover{background:#171b19}
 .tool-ghost:hover{border-color:#9ccdf5;color:var(--blue);background:var(--blue-bg)}
 .ghost-plus{font-size:14px;line-height:1}
 .tool-ghost .tool-name{color:inherit}
-.outline-ghost{grid-template-columns:auto auto 1fr;margin-top:10px;border:1px dashed var(--line);border-radius:8px;color:var(--muted)}
-.outline-ghost:hover{border-color:#9ccdf5;color:var(--blue);background:var(--blue-bg)}
-.outline-ghost .outline-name{color:inherit}
 .tool.off .tool-name{text-decoration:none;color:#909692}
-.outline{max-width:760px;margin:0 auto}
-.outline .tool{grid-template-columns:9px minmax(0,1fr) 18px auto;min-height:58px}
 .detail{grid-template-rows:82px minmax(0,1fr)}
 .detail-body{display:block}
 .content{height:100%;padding:20px 20px 70px}
@@ -162,7 +154,7 @@ pre.annotatable:hover{background:#171b19}
 .tree-panel{grid-template-rows:48px minmax(0,1fr)}
 .panel-head{padding:0 14px 0 20px}
 .tree-scroll{padding:28px 34px}
-.map{position:relative;isolation:isolate;grid-template-columns:max-content max-content minmax(220px,255px);column-gap:90px;justify-content:center}
+.map{position:relative;isolation:isolate;grid-template-columns:max-content minmax(220px,255px);column-gap:90px;justify-content:center}
 .map>.node, .map>.tools{z-index:1}
 .node{min-height:44px;margin-top:10px;padding:0 14px;border-radius:10px;box-shadow:0 1px 2px #1c231e0a}
 .node:after, .tool:before, .page:before{display:none}
@@ -185,8 +177,43 @@ pre.annotatable:hover{background:#171b19}
 .top-actions .chip:not(.status){display:none}
 @media(max-width:1220px){.workspace{grid-template-columns:minmax(0,1fr) 385px}
 .tree-scroll{padding:26px 20px}
-.map{grid-template-columns:max-content max-content minmax(205px,220px);column-gap:54px}
+.map{grid-template-columns:max-content minmax(205px,220px);column-gap:54px}
 }
+/* Scope grouping: the third map column is a stack of scope groups, each a
+   [scope node | its tools] row, so page → scope → tool reads as a tree and
+   site-wide vs page/state-scoped tools are told apart at a glance. The tools
+   width moves from the .map track onto .scope-group so groups own their row. */
+.map{grid-template-columns:max-content max-content}
+/* The upstream nodes read as parents of the whole column, so they sit at its
+   vertical middle, not its first row. */
+.map>.page{align-self:center;margin-top:0}
+/* Shared auto-sized first track: .tools owns the two columns and each group
+   subgrids into them, so scope nodes, tool cards and the ghost "Request tool"
+   row all line up across groups while the label column fits its longest label. */
+.tools{display:grid;grid-template-columns:minmax(176px,max-content) minmax(220px,255px);column-gap:40px;row-gap:18px}
+.tools>.plan-warning,.tools>.empty-state{grid-column:1/-1}
+.scope-group{display:grid;grid-column:1/-1;grid-template-columns:subgrid;align-items:center}
+.scope-tools{min-width:0;display:flex;flex-direction:column;gap:8px}
+.scope-node{margin-top:0;max-width:100%;min-height:36px;padding:0 11px;font:600 10px var(--mono);color:var(--muted)}
+.scope-node svg{width:12px;height:12px;flex:none}
+.scope-node .scope-label{overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.scope-node .page-count{margin-left:2px}
+.scope-node.sk-undeclared{border-style:dotted;color:var(--gold)}
+.cond-mark{display:inline-flex;flex:none;margin-left:auto;color:var(--muted)}
+.cond-mark svg{width:10px;height:10px}
+.tool .cond-mark+.check{margin-left:8px}
+.scope-chips{display:inline-flex;gap:5px;min-width:0}
+.scope-chip.sc-cond{border-style:dashed}
+.scope-tools .tool-ghost{margin-top:0}
+.scope-chip{display:inline-flex;align-items:center;gap:5px;min-height:20px;padding:0 8px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font:500 9.5px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scope-chip svg{width:10px;height:10px;flex:none}
+.scope-chip.sc-undeclared{border-style:dotted;color:var(--gold)}
+.scope-line{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.scope-note{color:var(--muted);font-size:11px}
+/* Narrow screens cap the whole .map, so a minmax() floor would win over the
+   label — a rigid max-content track keeps labels whole and lets the pannable
+   canvas absorb the overflow instead. */
+@media(max-width:1220px){.tools{grid-template-columns:max-content minmax(205px,220px);column-gap:24px}.scope-node .scope-label{max-width:220px}}
 /* v4 polish */
 :root{--panel-soft:#fafbfa;--code:#f7f9fb;--code-head:#f1f4f6;--shadow:#1c231e0a;--review-h:140px;--detail-w:420px;color-scheme:light}
 :root[data-theme="dark"]{--bg:#121614;--panel:#191e1b;--panel-soft:#161b18;--ink:#e7ece8;--muted:#949d97;--line:#303833;--blue:#58b3ff;--blue-bg:#172a36;--green:#78bd91;--green-bg:#17271d;--gold:#d2ae56;--gold-bg:#2c2516;--red:#dc8577;--red-bg:#311e1b;--code:#111613;--code-head:#171d19;--shadow:#0005;color-scheme:dark}
@@ -277,26 +304,7 @@ pre.codeview{width:100%;min-width:0;min-height:360px;margin:0;padding:15px;overf
 .tool.off{opacity:.52;background:var(--panel)}
 .tool.off .tool-name{text-decoration:line-through;text-decoration-thickness:1px}
 .tool .check{margin-left:auto}
-.outline{max-width:820px}
-.outline-page{width:100%;min-height:42px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;text-align:left}
-.outline-page:hover, .outline-tool:hover{background:var(--panel-soft)}
-.outline-chevron{color:var(--muted);font-size:17px;transition:transform .18s}
-.outline-page.open .outline-chevron{transform:rotate(90deg)}
-.outline-route{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:650 13px var(--mono)}
-.outline-total{color:var(--muted);font-size:11.5px}
-.outline-children{display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease}
-.outline-children.open{grid-template-rows:1fr}
-.outline-clip{overflow:hidden}
-.outline-list{padding:2px 0 5px 20px}
-.outline-tool{width:100%;min-height:38px;display:grid;grid-template-columns:8px max-content minmax(0,1fr) 15px;align-items:center;gap:10px;padding:7px 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;text-align:left}
-.outline-tool.active{background:var(--blue-bg)}
-.outline-tool.off{opacity:.5}
-.outline-tool.off .outline-name{text-decoration:line-through}
-.outline-name{font:500 11.5px var(--mono);white-space:nowrap}
-.outline-summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px}
-.outline-tool .check{width:15px;height:15px}
 .tool .check{margin-left:auto}
-.outline-tool{position:relative;grid-template-columns:8px max-content minmax(0,1fr) 15px}
 .tool-feedback-status{color:var(--muted);font-size:9px}
 .tour-section{max-height:calc(100% - 18px);overflow:auto}
 .review{position:relative;align-items:stretch;min-height:0;overflow:hidden;padding:28px 12px 28px}
@@ -452,6 +460,16 @@ pre.codeview{width:100%;min-width:0;min-height:360px;margin:0;padding:15px;overf
 .stage-hint strong{display:block;font-size:13px}
 .stage-hint p{margin:4px 0 0;color:var(--muted);font-size:12.5px;line-height:1.5}
 .agent-card-foot{display:flex;justify-content:flex-end;padding:14px 30px;border-top:1px solid var(--line)}
+.connect-card{position:relative;width:min(520px,92vw);min-width:380px;display:block}
+.connect-card-body{display:grid;gap:24px;padding:38px 34px;text-align:center}
+.connect-card-body h2{margin:0;font-size:24px;letter-spacing:-.025em}
+.connect-copy{max-width:390px;margin:-10px auto 0;color:var(--muted);font-size:14px;line-height:1.55}
+.connect-actions{display:flex;justify-content:center;gap:10px}
+.connect-actions .small{min-width:170px}
+.connect-actions .primary{border-color:#1e83d9;background:var(--blue);color:#fff}
+.connect-actions .primary:hover:not(:disabled){filter:brightness(1.06)}
+.connect-actions button:disabled{cursor:wait;opacity:.62}
+.connect-close{position:absolute;top:14px;right:14px}
 .small.danger{border-color:#e6c4bd;background:var(--red-bg);color:var(--red)}
 .small.danger:hover{border-color:var(--red);background:#ffe9e4}
 .confirm::backdrop{background:#1c231e5c}
@@ -481,10 +499,10 @@ pre.codeview{width:100%;min-width:0;min-height:360px;margin:0;padding:15px;overf
 @keyframes typing{0%,60%,100%{opacity:.25}30%{opacity:1}}
 .tool-status.st-declined{background:var(--red);opacity:.5}
 .status-pill.st-declined{background:var(--red-bg);color:var(--red)}
-.node.page{max-width:230px;overflow:hidden}
+.node.page{max-width:420px;overflow:hidden}
 #journeyLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plan-warning{margin-bottom:8px;padding:9px 11px;border:1px solid #ead4cf;border-radius:9px;background:var(--red-bg);color:var(--red);font-size:10.5px;line-height:1.5}
-.tool.dupe,.outline-tool.dupe{opacity:.6;cursor:default}
+.tool.dupe{opacity:.6;cursor:default}
 .dupe-badge{margin-left:auto;padding:3px 7px;border-radius:99px;background:var(--red-bg);color:var(--red);font:700 8px var(--mono);letter-spacing:.05em;text-transform:uppercase}
 .extra-file button{margin-top:6px}
 /* NEK-711: readable laptop scale and a review-first first-run hierarchy. */
@@ -512,7 +530,7 @@ body{font-size:18px}
 .top-actions{gap:9px}
 .top-button:disabled{cursor:not-allowed;opacity:.45}
 .eyebrow,.label,.schema .sh,.conversation .conv-label,.msg .who{font-size:15px}
-.seg button,.node,.tool-name,.outline-name,.outline-summary,.outline-total,.selection,.annotatable,.schema,.whole,.small,.status-bar,.rail-flyout textarea,.submit,.toast,.tour-invite p,.feedback-copy,.msg,.chat .chat-empty,.empty-state,.plan-warning{font-size:18px}
+.seg button,.node,.tool-name,.selection,.annotatable,.schema,.whole,.small,.status-bar,.rail-flyout textarea,.submit,.toast,.tour-invite p,.feedback-copy,.msg,.chat .chat-empty,.empty-state,.plan-warning{font-size:18px}
 .page-count,.disclosure>summary,.summary-count,.codehead,.status-pill,.tool-feedback-status,.flash-tag,.dupe-badge,.extra-file b,.extra-file pre{font-size:16px}
 .detail-head-top h1{font-size:24px}
 .tour-invite strong,.rail-flyout strong,.build-row strong{font-size:20px}
@@ -520,19 +538,16 @@ body{font-size:18px}
 .rail-button svg{width:20px;height:20px}
 .rail-flyout{width:400px}
 .rail-count{font-size:13px}
-.outline-route{font-size:20px}
 pre.annotatable,pre.codeview{font-size:17px;line-height:1.6}
 .webmcp-tour .driver-popover-title{font-size:20px}
 .webmcp-tour .driver-popover-description,.webmcp-tour .driver-popover-progress-text{font-size:18px}
 .webmcp-tour .driver-popover-footer-btn{font-size:16px}
 .check{width:22px;height:22px;font-size:15px}
-.tool .check,.outline-tool .check{width:21px;height:21px;font-size:14px}
+.tool .check{width:21px;height:21px;font-size:14px}
 .panel-head,.tree-panel{min-height:58px}
 .tree-panel{grid-template-rows:minmax(58px,auto) minmax(0,1fr)}
 .node{min-height:58px}
 .tool{min-height:58px}
-.outline-page{min-height:52px}
-.outline-tool{min-height:50px}
 .selection,.small{min-height:40px}
 .disclosure>summary{min-height:56px}
 .whole{min-height:94px}
@@ -640,7 +655,7 @@ pre.annotatable,pre.codeview{font-size:17px;line-height:1.6}
 .msg-copy.copied .sheets{display:none}
 @keyframes copy-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}
 .msg-pill:hover{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue)}
-.tool.hl,.outline-tool.hl{box-shadow:0 0 0 2px var(--blue),0 0 0 5px #279cff26}
+.tool.hl{box-shadow:0 0 0 2px var(--blue),0 0 0 5px #279cff26}
 /* Verify chips: consistent metrics with the meta chips above them. */
 a.top-button{display:inline-flex;align-items:center;gap:3px;text-decoration:none}
 a.top-button svg{width:17px;height:17px;flex:none}
@@ -683,7 +698,60 @@ a.top-button svg{width:17px;height:17px;flex:none}
 .review.minimized .conv-label{writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.12em}
 .review.minimized #chatExpand{display:none}
 #chatMinimize svg{transform:rotate(90deg)}
-@media(max-width:1250px){.top{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:12px}.brand .dim{display:none}.phase-step{padding:6px;font-size:14px}.map{grid-template-columns:max-content max-content minmax(240px,1fr);column-gap:32px;max-width:670px}}
+/* The full-size header row fits at ~1320px and not below; 1360 leaves margin for the
+   theme label and star count varying in width. */
+@media(max-width:1360px){.top{gap:12px}.brand .dim{display:none}.phase-step{padding:6px;font-size:14px}}
+@media(max-width:1250px){.map{grid-template-columns:max-content minmax(240px,1fr);column-gap:32px;max-width:720px}.node.page{max-width:300px}}
+/* Below this even the compressed single row overlaps, so the header goes two-row: brand and
+   actions keep the top line, the phase rail drops to its own line underneath. */
+@media(max-width:1080px){.top{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}.phase-steps{grid-column:1/-1;grid-row:2;justify-content:flex-start}}
+/* Outline view: the map's scope tree as one nested-card document — the site,
+   then a global card and one card per page route. Same data attributes as the
+   map, so picks/selection/request all ride the existing delegation; only the
+   presentation differs. */
+.outline{display:none;position:relative;max-width:820px;margin:0 auto}
+.outline-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.outline-links path{stroke:#bcd9f0;stroke-width:1.5;fill:none;stroke-linecap:round}
+.tree-scroll.outline-mode .outline{display:block}
+.outline .node{display:inline-flex;margin-top:0}
+.outline .node.page{max-width:340px}
+.outline .node svg{width:16px;height:16px;flex:none}
+.outline .node .scope-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.outline .cond-mark{display:none}
+.outline .tool .cond-mark+.check{margin-left:auto}
+/* Tree rails are SVG (renderOutlineLinks), not CSS borders: two separate
+   border strokes (a container rail plus per-child elbows) rasterize at
+   different subpixels under canvas zoom and show doubled or detached lines.
+   One measured path draws the rail and every branch as a single stroke. */
+.outline-children{position:relative;margin:12px 0 0 18px;padding-left:26px;display:flex;flex-direction:column;gap:12px}
+.outline-card{border:1px solid var(--line);border-radius:13px;background:var(--panel-soft,#fafbfa);padding:14px 15px 15px}
+.outline-card-head{display:flex;align-items:center;gap:9px;min-height:24px}
+.outline-card-head svg{width:16px;height:16px;flex:none}
+.outline-card-title{font:700 15px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.outline-count{margin-left:auto;padding:3px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel);color:var(--muted);font:600 13px var(--mono);white-space:nowrap}
+.outline-card-sub{margin:4px 0 0;color:var(--muted);font-size:15px}
+.outline-list{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.outline-list .tool{min-height:50px}
+.tg-everywhere{border-color:#cfe4d5;background:var(--green-bg)}
+.tg-everywhere .outline-card-head{color:var(--green)}
+.tg-page{border-color:#b7d9f6;background:var(--blue-bg)}
+.tg-page .outline-card-head{color:var(--blue)}
+.tg-undeclared{border-style:dotted;border-color:#e2d3ab;background:var(--gold-bg)}
+.tg-undeclared .outline-card-head{color:var(--gold)}
+.outline-subhead{width:100%;padding:0;border:0;background:transparent;color:inherit;cursor:pointer;text-align:left}
+.outline-route{margin-left:auto;padding:2px 9px;border-radius:7px;background:#d9ecfb;font:600 13.5px var(--mono);white-space:nowrap}
+.outline-subhead .outline-count{margin-left:10px}
+.outline-chevron{color:var(--muted);font-size:16px;line-height:1;transition:transform .18s}
+.outline-card.open .outline-chevron{transform:rotate(90deg)}
+.tg-page .outline-list{display:none}
+.tg-page.open .outline-list{display:flex}
+.outline .tool-ghost{width:100%;margin-top:0;min-height:50px;border-radius:11px}
+.outline .plan-warning{margin-bottom:12px}
+:root[data-theme="dark"] .outline-links path{stroke:#2f4356}
+:root[data-theme="dark"] .tg-everywhere{border-color:#2c4a37}
+:root[data-theme="dark"] .tg-page{border-color:#20374d}
+:root[data-theme="dark"] .tg-undeclared{border-color:#584a26}
+:root[data-theme="dark"] .outline-route{background:#1c3247}
 </style>
 </head>
 
@@ -703,7 +771,7 @@ a.top-button svg{width:17px;height:17px;flex:none}
         </div>
       </header>
       <div class="tree-scroll" id="treeScroll">
-        <div class="map"><svg class="map-links" id="mapLinks" aria-hidden="true"></svg><div class="node root"><i class="dot dot-live"></i>Interactive plan</div><div class="node page" id="journeyNode"><span id="journeyLabel">…</span><span class="page-count" id="pageCount">0</span></div><div class="tools" id="tools"></div></div>
+        <div class="map"><svg class="map-links" id="mapLinks" aria-hidden="true"></svg><div class="node page" id="journeyNode"><i class="dot dot-live"></i><span id="journeyLabel">…</span><span class="page-count" id="pageCount">0</span></div><div class="tools" id="tools"></div></div>
         <div class="outline" id="outline"></div>
         <div class="extras" id="extras"></div>
       </div>
@@ -723,6 +791,16 @@ a.top-button svg{width:17px;height:17px;flex:none}
           <aside class="stage-hint"><span class="stage-hint-badge" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="12.6" r="12.4" fill="currentColor" stroke="none" opacity=".06"/><circle cx="16" cy="12.6" r="8.4" fill="currentColor" stroke="none" opacity=".08"/><path d="M16 4.5A7.5 7.5 0 0 0 11.6 18a2.6 2.6 0 0 1 1.1 2.1v.4h6.6v-.4a2.6 2.6 0 0 1 1.1-2.1A7.5 7.5 0 0 0 16 4.5Z" fill="currentColor" fill-opacity=".14"/><path d="M12.7 23.6h6.6M14.2 26.6h3.6"/><path d="M16 11.4v6.4"/><path d="M16 1.6v1.5M25.2 6.8l-1 1.1M28.4 16h-1.5M3.6 16H5.1M6.8 6.8l1 1.1" opacity=".55"/></svg></span><div><strong>You can close this window.</strong><p>The agent keeps building in the terminal. Reopen it from “Build status” in the bar at the bottom — nothing is lost.</p></div></aside>
         </div>
         <footer class="agent-card-foot"><button class="small danger" id="cancelBuild">Stop the build</button></footer>
+      </article>
+    </dialog>
+    <dialog class="agent-stage" id="connectStage" aria-live="polite">
+      <article class="agent-card connect-card">
+        <button class="agent-close connect-close" id="connectClose" type="button" aria-label="Close" hidden>×</button>
+        <div class="connect-card-body">
+          <h2 id="connectTitle">Connect WebMCP Kit to AgentLane</h2>
+          <p class="connect-copy" id="connectCopy">See registered tools and their activity in AgentLane. Your built tools stay in this project.</p>
+          <div class="connect-actions" id="connectActions"><button class="small" id="skipConnect" type="button">Skip for now</button><button class="small primary" id="startConnect" type="button">Connect to AgentLane</button></div>
+        </div>
       </article>
     </dialog>
     <dialog class="confirm" id="cancelConfirm">
@@ -885,7 +963,7 @@ function connect(){
 }
 function send(type,payload,onRecorded,onError){
   if(!socket||socket.readyState!==1){if(onError)onError();toast("Not connected — nothing was sent");return false}
-  if(type==="submit"||type==="approve")requests.forEach(function(r,id){
+  if(type==="submit"||type==="approve"||type==="connect")requests.forEach(function(r,id){
     if(r.type===type&&r.state==="retryable")requests.delete(id);
   });
   var requestId=newRequestId(),r={requestId:requestId,type:type,payload:payload,payloadKey:canonicalJson(payload),state:"saving",created:requestSeq,
@@ -904,16 +982,17 @@ function submittedNow(){return ui.submitted||!!(model&&model.submitted)}
    Maps, not objects: suggestion ids come off disk and "__proto__" must be a key
    like any other. Nothing here survives a reload except the tour flag and theme. */
 var ui={activeId:null,picks:new Map(),notes:new Map(),open:new Map(),expandedFiles:new Set(),general:"",toolRequest:"",railMode:null,connDown:false,submitted:false,submitting:false,chatLocal:[],awaitingReply:false,claudeSeen:0,chatCount:0,revealTs:null,revealReady:false,
-        view:"map",outlineOpen:true,chatExpanded:false,chatMinimized:false,stageClosed:false,approved:false,approving:false,canvasZoom:.75,panX:0,panY:0,
-        reviewHeight:250,inspectorWidth:500};
+        view:"map",outlineClosed:new Set(),chatExpanded:false,chatMinimized:false,stageClosed:false,approved:false,approving:false,canvasZoom:.75,panX:0,panY:0,
+        connectAction:"",connectSaving:false,connectClosed:false,reviewHeight:250,inspectorWidth:500};
 var flashUntil=new Map(),flashTimer=null,prevSig=null,prevPhase=null;
+var prevConnectState="";
 
 function $(s){return document.querySelector(s)}
 function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
 
 /* ── One normalization pass per update ────────────────────────────────────────
    Every render helper reads this model; nothing re-parses the state folder. */
-var KNOWN_FIELDS={id:1,name:1,description:1,why:1,status:1,params:1};
+var KNOWN_FIELDS={id:1,name:1,description:1,why:1,status:1,params:1,availability:1};
 var CHAT_WINDOW=100,PREVIEW=2000;
 
 function ndjson(name){
@@ -996,7 +1075,7 @@ function foldStatus(events){
       if(ph==="verify"&&phase!=="verify")steps.forEach(function(m){m.delete("verify")});
       phase=ph;return;
     }
-    var run=safeStr(e.run_step);
+    var run=safeStr(e.run||e.run_step);
     if(run){runSteps.set(run,{state:safeStr(e.state)||"start"});return}
     var id=safeStr(e.suggestion),step=safeStr(e.step);
     if(!id||!step)return;
@@ -1007,6 +1086,22 @@ function foldStatus(events){
       startTs:(prev&&prev.startTs)||(state==="start"?ts:"")});
   });
   return{phase:phase,steps:steps,runSteps:runSteps};
+}
+/* Availability is where a tool registers: site-wide or on specific pages —
+   those are the only two scopes. A registration condition ("cart has items")
+   is a property of the tool, not a place, and rides along as `when`. A missing
+   or malformed declaration normalizes to null and the map files the tool under
+   "Scope not declared" — never a silent "site-wide", because an undeclared
+   scope is a question, not a default. */
+var SCOPE_KINDS={everywhere:1,page:1};
+function normAvailability(v){
+  if(!v||typeof v!=="object"||Array.isArray(v))return null;
+  var scope=safeStr(v.scope);
+  if(!Object.prototype.hasOwnProperty.call(SCOPE_KINDS,scope))return null;
+  var where=safeStr(v.where).trim();
+  if(scope==="page"&&!where)return null;
+  return{scope:scope,where:scope==="everywhere"?"":where,
+         when:safeStr(v.when).trim(),note:safeStr(v.note).trim()};
 }
 function normalize(){
   var plan={};
@@ -1022,6 +1117,7 @@ function normalize(){
     var entry={
       id:id,name:safeStr(s.name)||id,description:safeStr(s.description),why:safeStr(s.why),
       status:status,statusKnown:known(status),
+      availability:normAvailability(s.availability),
       params:(Array.isArray(s.params)?s.params:[]).filter(function(x){return x&&typeof x==="object"&&!Array.isArray(x)})
         .map(function(x){return{name:safeStr(x.name),type:safeStr(x.type),description:safeStr(x.description)}}),
       extras:pairs(s,KNOWN_FIELDS),duplicate:duplicate
@@ -1059,11 +1155,12 @@ function normalize(){
   // reading it back is what makes a submit survive a reload: the agent takes tens of
   // seconds to notice one and append phase `build`, and for that whole gap a reopened
   // page used to show an enabled Submit button and accept a second one.
-  var recorded=new Map(),submitted="",approval=null,lastOrder=-1;
+  var recorded=new Map(),submitted="",approval=null,connectDecision=null,lastOrder=-1;
   feedback.forEach(function(e){
     if(!e._legacy&&Number.isSafeInteger(e.order))lastOrder=Math.max(lastOrder,e.order);
     if(e.type==="submit"){submitted=safeStr(e.ts)||submitted;return}
     if(e.type==="approve"&&!e._legacy){approval=e;return}
+    if(e.type==="connect"&&!e._legacy){connectDecision=e;return}
     if(e.type!=="pick")return;
     var id=safeStr(e.suggestion);
     if(id)recorded.set(id,e.picked!==false);
@@ -1082,7 +1179,7 @@ function normalize(){
 
   // Anything else the agent left in the folder is shown, not hidden.
   var delivery=foldDelivery(ndjson("_delivery.ndjson")),handled=handledEvents(ndjson("_ack.ndjson"));
-  var actionable={comment:1,submit:1,feedback:1,approve:1,cancel:1},latestUnacked=null;
+  var actionable={comment:1,submit:1,feedback:1,approve:1,cancel:1,connect:1},latestUnacked=null;
   feedback.forEach(function(e){if(actionable[e.type]&&safeStr(e.event_id)&&!handled.has(safeStr(e.event_id)))latestUnacked=e});
 
   var owned={"plan.json":1,"_status.ndjson":1,"_chat.ndjson":1,"_feedback.ndjson":1,"_delivery.ndjson":1,"_ack.ndjson":1};
@@ -1092,7 +1189,7 @@ function normalize(){
 
   return{journey:safeStr(plan.journey),site:safeStr(plan.site),suggestions:suggestions,canonical:canonical,byId:byId,phase:phase,steps:steps,runSteps:runSteps,
          chat:chat,recorded:recorded,code:code,extraFiles:extraFiles,submitted:submitted,
-         approval:approval,lastOrder:lastOrder,feedback:feedback,delivery:delivery,handled:handled,latestUnacked:latestUnacked,
+         approval:approval,connectDecision:connectDecision,lastOrder:lastOrder,feedback:feedback,delivery:delivery,handled:handled,latestUnacked:latestUnacked,
          planExtras:pairs(plan,{journey:1,site:1,suggestions:1})};
 }
 
@@ -1103,7 +1200,7 @@ function signature(){
   var sig=new Map();
   model.canonical.forEach(function(s){
     var c=model.code.get(s.id);
-    sig.set(s.id,jsonish([s.name,s.description,s.why,s.status,s.params,s.extras,c&&c.text]));
+    sig.set(s.id,jsonish([s.name,s.description,s.why,s.status,s.availability,s.params,s.extras,c&&c.text]));
   });
   return sig;
 }
@@ -1152,6 +1249,71 @@ function logLocal(re,text,key){
 function claudeCount(){return model?model.chat.filter(function(m){return m.who==="claude"}).length:0}
 function expectReply(){ui.awaitingReply=true;ui.claudeSeen=claudeCount();renderChat()}
 
+/* ── Scope grouping ───────────────────────────────────────────────────────────
+   Site-wide and page-specific tools must not read as one flat list: where a
+   tool registers is part of the contract under review. The map's third column is
+   a stack of scope groups — [scope node | its tools] — so page → scope → tool
+   reads as a tree. Groups keep plan order within a kind; kinds order site-wide →
+   page → undeclared. A registration condition never forms a group of its own —
+   it renders as a marker on the tool. */
+var SCOPE_ORDER={everywhere:0,page:1,undeclared:2};
+var SCOPE_GLYPHS={
+  everywhere:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13.5 13.5 0 0 1 0 18M12 3a13.5 13.5 0 0 0 0 18"/></svg>',
+  page:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/></svg>',
+  undeclared:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.4 2.4 0 1 1 3.3 2.2c-.7.3-.9.9-.9 1.6"/><path d="M12 16.6h.01"/></svg>'
+};
+var COND_GLYPH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.6 20.4 12 12 20.4 3.6 12z"/></svg>';
+function scopeGroupTitle(g){
+  if(g.kind==="everywhere")return"These tools register on every page of the site.";
+  if(g.kind==="page")return"These tools register only on "+g.label+" and act on what it shows.";
+  return"The plan does not say where these tools register — ask the agent to declare it.";
+}
+function scopeKind(s){return s.availability?s.availability.scope:"undeclared"}
+function scopeLabel(s){
+  var a=s.availability;
+  return a?(a.scope==="everywhere"?"Site-wide":a.where):"Scope not declared";
+}
+function scopeGlyph(kind){return new Html(SCOPE_GLYPHS[kind]||SCOPE_GLYPHS.undeclared)}
+function scopeGroups(list){
+  var groups=[],byKey=new Map();
+  list.forEach(function(s){
+    var kind=scopeKind(s),label=scopeLabel(s),key=kind+"\n"+label;
+    var g=byKey.get(key);
+    if(!g){g={kind:kind,label:label,tools:[]};byKey.set(key,g);groups.push(g)}
+    g.tools.push(s);
+  });
+  return groups.sort(function(a,b){return SCOPE_ORDER[a.kind]-SCOPE_ORDER[b.kind]});
+}
+function condTitle(s){
+  var a=s.availability;
+  return a&&a.when?"Only while "+a.when+(a.note?" — "+a.note:""):"";
+}
+function condMark(s){
+  var t=condTitle(s);
+  return t?html`<i class="cond-mark" title="${t}">${new Html(COND_GLYPH)}</i>`:"";
+}
+function scopeTitle(s){
+  var a=s.availability;
+  if(!a)return"The plan does not say where this tool registers.";
+  var head=a.scope==="everywhere"?"Registers on every page":"Registers only on "+a.where;
+  if(a.when)head+=", only while "+a.when;
+  return a.note?head+" — "+a.note:head;
+}
+function scopeChip(s){
+  var kind=scopeKind(s);
+  return html`<span class="scope-chips"><span class="scope-chip sc-${kind}" title="${scopeTitle(s)}">${scopeGlyph(kind)}${scopeLabel(s)}</span>${
+    s.availability&&s.availability.when?html`<span class="scope-chip sc-cond" title="${condTitle(s)}">${new Html(COND_GLYPH)}${"while "+s.availability.when}</span>`:""}</span>`;
+}
+function scopeDetail(s){
+  var a=s.availability;
+  if(!a)return"The plan does not declare where this tool registers — ask the agent to add it.";
+  var out=a.scope==="everywhere"?"Registers on every page of the site.":
+          "Registers only there; agents on other pages will not see it.";
+  if(a.when)out+=" Only while "+a.when+".";
+  if(a.note)out+=" "+a.note.replace(/\.?$/,".");
+  return out;
+}
+
 /* ── Rendering ───────────────────────────────────────────────────────────────── */
 function checkBox(s){
   var on=picked(s.id);
@@ -1166,19 +1328,17 @@ function renderTree(){
   var dupes=list.length-live.length;
   // Requests reach the agent only while the plan can still change — same rule as the rail.
   var canRequest=model.phase!=="verify"&&model.phase!=="done";
+  var toolCard=function(s){
+    if(s.duplicate)return html`<div class="tool dupe" title="${"duplicate id: "+s.id}"><i class="tool-status st-unknown"></i><span class="tool-name">${s.name}</span><span class="dupe-badge">duplicate id</span></div>`;
+    return html`<div class="${rowClass(s,"tool")}" data-suggestion="${s.id}"><i class="tool-status ${statusClass(s.status)}" title="${s.status}"></i><span class="tool-name">${s.name}</span>${condMark(s)}${checkBox(s)}</div>`;
+  };
   setHtml($("#tools"),list.length?html`${dupes?html`<div class="plan-warning">${dupes+" suggestion"+(dupes===1?"":"s")+" repeat an id already in the plan. Only the first of each id is actionable — ask the agent to give them distinct ids."}</div>`:""}${
-    list.map(function(s){
-      if(s.duplicate)return html`<div class="tool dupe" title="${"duplicate id: "+s.id}"><i class="tool-status st-unknown"></i><span class="tool-name">${s.name}</span><span class="dupe-badge">duplicate id</span></div>`;
-      return html`<div class="${rowClass(s,"tool")}" data-suggestion="${s.id}"><i class="tool-status ${statusClass(s.status)}" title="${s.status}"></i><span class="tool-name">${s.name}</span>${checkBox(s)}</div>`;
+    scopeGroups(list).map(function(g){
+      return html`<div class="scope-group"><div class="node scope-node sk-${g.kind}" title="${scopeGroupTitle(g)}">${scopeGlyph(g.kind)}<span class="scope-label">${g.label}</span><span class="page-count">${g.tools.length}</span></div><div class="scope-tools">${g.tools.map(toolCard)}</div></div>`;
     })
-  }${canRequest?html`<button class="tool tool-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="tool-name">Request tool</span></button>`:""}`:html`<div class="empty-state">No tool suggestions yet. This page updates the moment the agent writes the interactive plan.</div>`);
+  }${canRequest?html`<div class="scope-group"><span></span><div class="scope-tools"><button class="tool tool-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="tool-name">Request tool</span></button></div></div>`:""}`:html`<div class="empty-state">No tool suggestions yet. This page updates the moment the agent writes the interactive plan.</div>`);
 
-  setHtml($("#outline"),html`<button class="outline-page ${ui.outlineOpen?"open":""}" data-outline-toggle><span class="outline-chevron">›</span><span class="outline-route">${model.site||model.journey||"Interactive plan"}</span><span class="outline-total">${live.length+" suggestion"+(live.length===1?"":"s")}</span></button><div class="outline-children ${ui.outlineOpen?"open":""}"><div class="outline-clip"><div class="outline-list">${
-    list.length?list.map(function(s){
-      if(s.duplicate)return html`<div class="outline-tool dupe"><i class="tool-status st-unknown"></i><span class="outline-name">${s.name}</span><span class="outline-summary">Duplicate id — not actionable</span><span class="dupe-badge">duplicate id</span></div>`;
-      return html`<div class="${rowClass(s,"outline-tool")}" data-suggestion="${s.id}"><i class="tool-status ${statusClass(s.status)}"></i><span class="outline-name">${s.name}</span><span class="outline-summary">${s.description||s.why}</span>${checkBox(s)}</div>`;
-    }):html`<div class="empty-state">Nothing to show yet.</div>`
-  }${list.length&&canRequest?html`<button class="outline-tool outline-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="outline-name">Request tool</span></button>`:""}</div></div></div>`);
+  renderOutline(list,live,toolCard,dupes,canRequest);
 
   $("#journeyLabel").textContent=model.site||model.journey||"Waiting for the plan…";
   $("#journeyNode").title=model.site||"";
@@ -1188,40 +1348,98 @@ function renderTree(){
   renderExtras();
   requestAnimationFrame(renderLinks);
 }
-/* Files and plan fields this page has no opinion about are still the user's
-   record — show them read-only rather than dropping them. */
-function renderExtras(){
-  var host=$("#extras"),items=model.planExtras,filesOver=model.extraFiles;
-  if(!items.length&&!filesOver.length)return setHtml(host,"");
-  setHtml(host,html`<details class="disclosure extras-panel" id="extrasPanel" ${ui.open.get("extrasPanel")?"open":""}><summary>Also in the state folder<span class="summary-count">${items.length+filesOver.length}</span></summary><div class="disclosure-body">${
-    items.length?html`<section class="field"><div class="label">Plan fields</div>${items.map(function(e){
-      return html`<div class="annotatable"><b>${e.key}:</b> ${e.value}</div>`;
-    })}</section>`:""
-  }${
-    filesOver.length?html`<section class="field"><div class="label">Other files</div>${filesOver.map(function(f){
-      var full=ui.expandedFiles.has(f.name),cut=!full&&f.text.length>PREVIEW;
-      return html`<div class="extra-file"><b>${f.name}</b><pre>${cut?f.text.slice(0,PREVIEW):f.text}</pre>${
-        cut?html`<button class="small" data-expand-file="${f.name}">truncated at ${PREVIEW+" of "+f.text.length} characters — show all</button>`:""
-      }</div>`;
-    })}</section>`:""
-  }</div></details>`);
+/* Outline view: one nested-card document — the site is the root, then a flat
+   run of cards: the global card, one card per page route, then undeclared.
+   Tool rows reuse the map's toolCard markup, so the same delegation drives
+   picks and selection. */
+function outlinePageTitle(where){
+  var segments=safeStr(where).split("/").filter(function(p){return p&&!/^[\[:{(]/.test(p)});
+  var last=(segments.length?segments[segments.length-1]:"").replace(/[-_]+/g," ").trim();
+  return last?last+" page":"page";
 }
+function outlineCount(n){return n+(n===1?" tool":" tools")}
+function renderOutline(list,live,toolCard,dupes,canRequest){
+  if(!list.length){
+    setHtml($("#outline"),html`<div class="empty-state">No tool suggestions yet. This page updates the moment the agent writes the interactive plan.</div>`);
+    return;
+  }
+  var groups=scopeGroups(list);
+  var byKind=function(kind){
+    return groups.filter(function(g){return g.kind===kind})
+      .reduce(function(acc,g){return acc.concat(g.tools)},[]);
+  };
+  var everTools=byKind("everywhere"),undeclaredTools=byKind("undeclared");
+  var pageGroups=groups.filter(function(g){return g.kind==="page"});
+  setHtml($("#outline"),html`<svg class="outline-links" id="outlineLinks" aria-hidden="true"></svg>${dupes?html`<div class="plan-warning">${dupes+" suggestion"+(dupes===1?"":"s")+" repeat an id already in the plan. Only the first of each id is actionable — ask the agent to give them distinct ids."}</div>`:""}<div class="node page">${scopeGlyph("everywhere")}<span class="scope-label" title="${model.site||""}">${model.site||model.journey||"Interactive plan"}</span><span class="page-count">${live.length}</span></div><div class="outline-children">${
+    everTools.length?html`<section class="outline-child outline-card tg-everywhere"><div class="outline-card-head">${scopeGlyph("everywhere")}<span class="outline-card-title">Global</span><span class="outline-count">${outlineCount(everTools.length)}</span></div><p class="outline-card-sub">Available everywhere on the site</p><div class="outline-list">${everTools.map(toolCard)}</div></section>`:""
+  }${
+    pageGroups.map(function(g){
+      return html`<section class="outline-child outline-card tg-page ${ui.outlineClosed.has(g.label)?"":"open"}"><button class="outline-card-head outline-subhead" data-outline-page="${g.label}" type="button" title="${scopeGroupTitle(g)}"><span class="outline-chevron">›</span>${scopeGlyph("page")}<span class="outline-card-title">${outlinePageTitle(g.label)}</span><span class="outline-route">${g.label}</span><span class="outline-count">${outlineCount(g.tools.length)}</span></button><div class="outline-list">${g.tools.map(toolCard)}</div></section>`;
+    })
+  }${
+    undeclaredTools.length?html`<section class="outline-child outline-card tg-undeclared"><div class="outline-card-head">${scopeGlyph("undeclared")}<span class="outline-card-title">Scope not declared</span><span class="outline-count">${outlineCount(undeclaredTools.length)}</span></div><p class="outline-card-sub">The plan does not say where these tools register — ask the agent to declare it</p><div class="outline-list">${undeclaredTools.map(toolCard)}</div></section>`:""
+  }${
+    canRequest?html`<div class="outline-child"><button class="tool tool-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="tool-name">Request tool</span></button></div>`:""
+  }</div>`);
+  requestAnimationFrame(renderOutlineLinks);
+}
+/* One measured path: the rail drops from the site node and a quarter-curve
+   branches into each card at its header line. Drawn after layout, exactly like
+   the map's renderLinks — CSS border rails rasterize apart under canvas zoom. */
+function renderOutlineLinks(){
+  var host=$("#outline"),svg=$("#outlineLinks");
+  if(!host||!svg||ui.view!=="outline")return;
+  var children=$$("#outline>.outline-children>.outline-child"),site=host.querySelector(".node.page");
+  if(!site||!children.length)return;
+  var offset=function(el){
+    var x=0,y=0,node=el;
+    while(node&&node!==host){x+=node.offsetLeft;y+=node.offsetTop;node=node.offsetParent}
+    return{x:x,y:y};
+  };
+  // The rail runs 26px left of the cards — the children container's own edge.
+  var railX=offset(children[0]).x-26,startY=offset(site).y+site.offsetHeight,r=10;
+  var d="";
+  children.forEach(function(child,i){
+    var at=offset(child),y=at.y+26;
+    if(i===children.length-1)d+="M "+railX+" "+startY+" V "+(y-r)+" ";
+    d+="M "+railX+" "+(y-r)+" Q "+railX+" "+y+" "+(railX+r)+" "+y+" H "+at.x+" ";
+  });
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  svg.appendChild(svgPath(d));
+}
+/* Files and plan fields this page has no opinion about stay untouched in the
+   state folder, but the "Also in the state folder" panel read as noise under
+   the canvas — hidden, not deleted, so the record is one comment away. */
+function renderExtras(){setHtml($("#extras"),"");}
 function svgPath(d){
   var path=document.createElementNS("http://www.w3.org/2000/svg","path");
   path.setAttribute("d",d);return path;
 }
 function renderLinks(){
-  var map=$(".map"),svg=$("#mapLinks"),root=$(".map>.root"),page=$(".map>.page"),cards=$$("#tools>.tool[data-suggestion]");
-  if(!map||!svg||!root||!page||ui.view!=="map")return;
+  var map=$(".map"),svg=$("#mapLinks"),page=$(".map>.page");
+  if(!map||!svg||!page||ui.view!=="map")return;
   var point=function(el,side){
     var x=0,y=0,node=el;
     while(node&&node!==map){x+=node.offsetLeft;y+=node.offsetTop;node=node.offsetParent}
     return{x:x+(side==="right"?el.offsetWidth:0),y:y+el.offsetHeight/2};
   };
-  var a=point(root,"right"),b=point(page,"left"),from=point(page,"right"),group=document.createDocumentFragment();
-  group.appendChild(svgPath("M "+a.x+" "+a.y+" L "+b.x+" "+b.y));
-  cards.forEach(function(card){var to=point(card,"left"),bend=Math.max(30,(to.x-from.x)*.48);
-    group.appendChild(svgPath("M "+from.x+" "+from.y+" C "+(from.x+bend)+" "+from.y+" "+(to.x-bend)+" "+to.y+" "+to.x+" "+to.y))});
+  var curve=function(from,to){
+    var bend=Math.max(30,(to.x-from.x)*.48);
+    return svgPath("M "+from.x+" "+from.y+" C "+(from.x+bend)+" "+from.y+" "+(to.x-bend)+" "+to.y+" "+to.x+" "+to.y);
+  };
+  var from=point(page,"right"),group=document.createDocumentFragment();
+  // Two-hop fan: page → each scope node, scope node → each of its tools. The
+  // scope hop is the point of the map — a tool's curve starts at its scope, so
+  // site-wide and page-scoped tools can never be mistaken for one flat list.
+  $$("#tools>.scope-group").forEach(function(block){
+    var node=block.querySelector(".scope-node");
+    if(!node)return;
+    group.appendChild(curve(from,point(node,"left")));
+    var mid=point(node,"right");
+    Array.prototype.forEach.call(block.querySelectorAll(".scope-tools>.tool[data-suggestion]"),function(card){
+      group.appendChild(curve(mid,point(card,"left")));
+    });
+  });
   while(svg.firstChild)svg.removeChild(svg.firstChild);
   svg.appendChild(group);
 }
@@ -1324,7 +1542,7 @@ function renderDetail(){
   detailShowing=s.id;
   $("#title").textContent=s.name;
   $("#changeTag").hidden=!flashing(s.id);
-  setHtml($("#content"),html`<section class="field"><div class="annotatable">${s.description||"No description yet."}</div></section>${
+  setHtml($("#content"),html`<section class="field"><div class="annotatable">${s.description||"No description yet."}</div></section><section class="field scope-field"><div class="label">Where it lives</div><div class="scope-line">${scopeChip(s)}<span class="scope-note">${scopeDetail(s)}</span></div></section>${
     model.code.get(s.id)?html`<button class="small code-open" type="button" data-code-expand="${s.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Generated code</button>`:""}${
     disclosure("parameters","Parameters",null,paramTable(s))}${
     SHOW_CODE_DISCLOSURE?disclosure("implementation","Generated code",null,codeSection(s)):""}${
@@ -1489,13 +1707,13 @@ function noteCount(){
   return k;
 }
 function durableWaitCopy(state){
-  if(state==="timeout")return "Saved safely. This run’s Codex task hasn’t handled it yet — resume or message that original task. If /hooks there lists this plugin, review its hook trust.";
-  if(state==="conflict"||state==="error")return "Saved safely, but automatic delivery needs attention. Resume or message this run’s original Codex task. If /hooks there lists this plugin, review its hook trust.";
-  if(state==="waiting"||state==="claimed")return "Saved — waiting for this run’s Codex task";
-  return "Saved safely — resume or message this run’s original Codex task. A different task must reconcile it manually.";
+  if(state==="timeout")return "Saved safely. This run’s agent task hasn’t handled it yet — resume or message that original task. If /hooks there lists this plugin, review its hook trust.";
+  if(state==="conflict"||state==="error")return "Saved safely, but automatic delivery needs attention. Resume or message this run’s original agent task. If /hooks there lists this plugin, review its hook trust.";
+  if(state==="waiting"||state==="claimed")return "Saved — waiting for this run’s agent task";
+  return "Saved safely — resume or message this run’s original agent task. A different task must reconcile it manually.";
 }
 function matchingRecordedEvent(r){
-  if(!RUN_ID||snapshotSeq<=r.reconcileAfter||(r.type!=="submit"&&r.type!=="approve"))return null;
+  if(!RUN_ID||snapshotSeq<=r.reconcileAfter||(r.type!=="submit"&&r.type!=="approve"&&r.type!=="connect"))return null;
   var match=null;
   model.feedback.forEach(function(e){
     if(e._legacy||e.run_id!==RUN_ID||e.type!==r.type||!safeStr(e.event_id)||!Number.isSafeInteger(e.order)||e.order<=r.afterOrder)return;
@@ -1527,7 +1745,7 @@ function syncRequests(){
       if(match)confirmRequest(r,match);else beginReconciliation(r);
     }
     if(!r.eventId||!model.handled.has(r.eventId)||r.state==="handled")return;
-    r.state="handled";toast("Handled by Codex");
+    r.state="handled";toast("Handled by the agent");
     setTimeout(function(){if(requests.get(id)===r){requests.delete(id);if(model)renderReview()}},2200);
   });
 }
@@ -1538,7 +1756,7 @@ function deliveryLine(){
     if(r.state==="uncertain")return "Save unconfirmed — waiting for a fresh journal snapshot before retrying.";
     if(r.state==="reconciling")return "Checking the refreshed journal before retrying…";
     if(r.state==="retryable")return "The action was not recorded. It is safe to retry.";
-    if(r.state==="handled")return "Handled by Codex";
+    if(r.state==="handled")return "Handled by the agent";
     if(r.state==="recorded")return durableWaitCopy(deliveryState({event_id:r.eventId,order:r.order}));
   }
   var e=model.latestUnacked;
@@ -1570,8 +1788,8 @@ function statusLine(p,list,n){
   }
   if(p==="review"){
     if(model.approval)return model.handled.has(model.approval.event_id)
-      ?"Approval handled by Codex. Waiting for verification to start…"
-      :"Approval saved. Waiting for Codex to handle it…";
+      ?"Approval handled by the agent. Waiting for verification to start…"
+      :"Approval saved. Waiting for the agent to handle it…";
     var b=list.filter(function(s){return s.status==="review"||s.status==="approved"}).length;
     return b+" tool"+(b===1?"":"s")+" built — review, then approve or send feedback.";
   }
@@ -1675,8 +1893,10 @@ function etaText(rows,built){
   if(secs<90)return "~"+Math.max(10,Math.round(secs/10)*10)+" sec left";
   return "~"+Math.round(secs/60)+" min left";
 }
+function connectState(){var step=model&&model.runSteps.get("connect");return step?safeStr(step.state):""}
+function connectBlocksStage(){var state=connectState();return state==="offer"||state==="start"||state==="failed"||(state==="done"&&!ui.connectClosed)}
 function renderStage(){
-  var p=model.phase,running=p==="build"||p==="verify",show=running&&!ui.stageClosed;
+  var p=model.phase,running=(p==="build"||p==="verify")&&!connectBlocksStage(),show=running&&!ui.stageClosed;
   // Every tool in the run is on the board from the first frame — queued until its turn —
   // so the list's length never changes, only each row's state. Declined tools stay off.
   // Counted up here rather than after the early return below, because the status-bar button
@@ -1711,11 +1931,12 @@ function renderStage(){
   if(p==="verify"){
     var RUN_LABEL={docs:["updating the docs…","docs updated"],pr:["opening the pull request…","pull request opened"]};
     model.runSteps.forEach(function(v,k){
+      if(k==="connect")return;
       var l=RUN_LABEL[k]||[k+"…",k+" done"],done=v.state==="done";
       out.push(html`<div class="build-row">${done?html`<span class="row-ico ok">✓</span>`:html`<span class="agent-spinner"></span>`}<span class="row-phrase">${done?l[1]:l[0]}</span></div>`);
     });
     var toolsDone=rows.length&&rows.every(function(s,i){return !states[i].spin&&states[i].phrase!=="queued"});
-    var anyRunSpinning=false;model.runSteps.forEach(function(v){if(v.state!=="done")anyRunSpinning=true});
+    var anyRunSpinning=false;model.runSteps.forEach(function(v,k){if(k!=="connect"&&v.state!=="done")anyRunSpinning=true});
     if(toolsDone&&!anyRunSpinning)out.push(html`<div class="build-row"><span class="agent-spinner"></span><span class="row-phrase">wrapping up the run…</span></div>`);
   }
   setHtml($("#buildList"),out.length?out:html`<div class="build-row bare"><span class="agent-spinner"></span><strong>Starting…</strong></div>`);
@@ -1746,7 +1967,35 @@ function renderStage(){
   if(rows.length&&built)bar.value=built/rows.length; else bar.removeAttribute("value");
   $("#cancelBuild").textContent=p==="verify"?"Stop verifying":"Stop the build";
 }
-function render(){renderTree();renderDetail();renderReview();renderStage();renderChat();refreshCodeModal();maybeOfferTour()}
+function connectPending(){
+  if(ui.connectSaving||ui.connectAction)return true;
+  var event=model.connectDecision;
+  return !!(event&&!model.handled.has(safeStr(event.event_id)));
+}
+function renderConnect(){
+  var state=connectState(),done=state==="done",show=state==="offer"||state==="start"||state==="failed"||(done&&!ui.connectClosed);
+  var stage=$("#connectStage");
+  if(!show){if(stage.open)stage.close();return}
+  $("#connectTitle").textContent=done
+    ?"Connected — "+model.canonical.filter(function(s){return s.status!=="declined"}).length+" tools ready"
+    :"Connect WebMCP Kit to AgentLane";
+  $("#connectCopy").textContent=done
+    ?"AgentLane is ready to show this project's registered tools and activity."
+    :state==="start"
+      ?"Finish the secure browser sign-in. Setup continues here automatically."
+      :state==="failed"
+        ?"The connection did not finish. Your built tools are unchanged — retry or skip for now."
+        :"See registered tools and their activity in AgentLane. Your built tools stay in this project.";
+  $("#connectActions").hidden=done;
+  $("#connectClose").hidden=!done;
+  var disabled=state==="start"||connectPending();
+  $("#startConnect").disabled=disabled;
+  $("#startConnect").textContent=state==="start"?"Connecting…":"Connect to AgentLane";
+  $("#skipConnect").disabled=disabled;
+  stage.setAttribute("aria-busy",state==="start"?"true":"false");
+  if(!stage.open)stage.showModal();
+}
+function render(){renderTree();renderDetail();renderReview();renderStage();renderConnect();renderChat();refreshCodeModal();maybeOfferTour()}
 function animateDetailOpen(){
   var pane=$(".detail");pane.classList.remove("entering");void pane.offsetWidth;pane.classList.add("entering");
 }
@@ -1758,6 +2007,13 @@ function onFiles(){
   markChanges();
   if(prevPhase&&model.phase!==prevPhase){
     ui.stageClosed=false;ui.submitted=false;ui.approved=false;codePulsed=false;
+  }
+  var nextConnectState=connectState();
+  if(nextConnectState!==prevConnectState){
+    if(nextConnectState==="offer"||nextConnectState==="failed"){
+      ui.connectAction="";ui.connectSaving=false;ui.connectClosed=false;
+    }else if(nextConnectState==="done")ui.connectClosed=false;
+    prevConnectState=nextConnectState;
   }
   if(model.phase==="done")finished=true;
   // Review is about reading the tools: on entering it (or loading into it) with no
@@ -1814,6 +2070,12 @@ function approve(){
   ui.approving=true;renderReview();
   send("approve",{},function(){ui.approving=false;ui.approved=true;render()},function(){ui.approving=false;renderReview()});
 }
+function chooseConnect(action){
+  ui.connectAction=action;ui.connectSaving=true;renderConnect();
+  send("connect",{action:action},function(){ui.connectSaving=false;renderConnect()},function(){
+    ui.connectAction="";ui.connectSaving=false;renderConnect();
+  });
+}
 
 /* ── Wiring ──────────────────────────────────────────────────────────────────── */
 var toastTimer=null;
@@ -1839,8 +2101,12 @@ document.addEventListener("click",function(e){
   if(e.target.closest("#showEarlier")){ui.chatExpanded=true;return renderChat()}
   x=e.target.closest("[data-expand-file]");
   if(x){ui.expandedFiles.add(x.dataset.expandFile);return renderExtras()}
-  x=e.target.closest("[data-outline-toggle]");
-  if(x){ui.outlineOpen=!ui.outlineOpen;return renderTree()}
+  x=e.target.closest("[data-outline-page]");
+  if(x){
+    var route=x.dataset.outlinePage;
+    ui.outlineClosed.has(route)?ui.outlineClosed.delete(route):ui.outlineClosed.add(route);
+    return renderTree();
+  }
   x=e.target.closest("[data-suggestion]");
   if(x){
     if(ui.activeId===x.dataset.suggestion)return;
@@ -1906,7 +2172,7 @@ document.addEventListener("click",function(e){
   if(!b)return;
   $("#cancelConfirm").close();
   if(b.dataset.cancelBuild!=="stop")return;
-  send("cancel",{},function(){toast("Saved — Codex will stop after the current tool")});
+  send("cancel",{},function(){toast("Saved — the agent will stop after the current tool")});
 });
 wireBackdropClose($("#cancelConfirm"),function(){$("#cancelConfirm").close()});
 wireBackdropClose($("#railFlyout"),closeRail);
@@ -2091,6 +2357,10 @@ $("#closeAgentStage").onclick=function(){$("#agentStage").close()};
 // Escape closes the dialog natively, so state syncs on the close event, not the button.
 $("#agentStage").addEventListener("close",function(){ui.stageClosed=true;renderStage()});
 $("#stageButton").onclick=function(){ui.stageClosed=false;renderStage()};
+$("#startConnect").onclick=function(){chooseConnect("connect")};
+$("#skipConnect").onclick=function(){chooseConnect("skip")};
+$("#connectClose").onclick=function(){ui.connectClosed=true;$("#connectStage").close();renderStage()};
+$("#connectStage").addEventListener("cancel",function(e){e.preventDefault()});
 
 function setTheme(theme){
   document.documentElement.dataset.theme=theme;

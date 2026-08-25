@@ -27,7 +27,7 @@ import type { Stats } from "node:fs";
 import { dirname, isAbsolute, join, parse } from "node:path";
 
 const VERSION = 1;
-const ACTIONABLE = new Set(["comment", "submit", "feedback", "approve", "cancel"]);
+const ACTIONABLE = new Set(["comment", "submit", "feedback", "approve", "cancel", "connect"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_INPUT_BYTES = 256 * 1024;
 const MAX_RUN_BYTES = 16 * 1024;
@@ -40,6 +40,10 @@ const MAX_TEXT_BYTES = 16 * 1024;
 const MAX_PICKS = 100;
 const DEFAULT_LEASE_MS = 15_000;
 const DEFAULT_STOP_WAIT_MS = 25_000;
+// A continued Stop turn can finish its prior action just before Explorer records
+// the next one. Keep that same turn alive briefly so the follow-up cannot fall
+// into the gap between the acknowledgement and the durable journal append.
+const DEFAULT_ACTIVE_STOP_WAIT_MS = 5_000;
 const DEFAULT_POLL_MS = 150;
 const DEFAULT_HEALTH_TIMEOUT_MS = 500;
 // The hook runner kills Stop after 35 seconds. A lock older than this ceiling
@@ -330,6 +334,12 @@ function validPayload(type: string, payload: unknown): payload is JsonObject {
         hasExactKeys(pick, ["suggestion", "note"]) &&
         validIdentifier(pick.suggestion) &&
         boundedString(pick.note, MAX_TEXT_BYTES, true),
+    );
+  }
+  if (type === "connect") {
+    return (
+      hasExactKeys(payload, ["action"]) &&
+      (payload.action === "connect" || payload.action === "skip")
     );
   }
   return (type === "approve" || type === "cancel") && hasExactKeys(payload, []);
@@ -1407,7 +1417,7 @@ async function main(): Promise<void> {
   if (mode === "pre-tool-use" && hookInput.eventName !== "PreToolUse") return;
   if (mode === "stop" && hookInput.eventName !== "Stop") return;
   if (mode !== "pre-tool-use" && mode !== "stop") return;
-  if (mode === "stop" && hookInput.stopHookActive) return;
+  const activeStop = mode === "stop" && hookInput.stopHookActive;
   const pluginPaths = installedPluginPaths();
   if (pluginPaths === null) return;
   if (mode === "pre-tool-use") {
@@ -1429,15 +1439,22 @@ async function main(): Promise<void> {
     else emitStop(runtime, claim.event, pluginPaths.ack);
     return;
   }
+  // A Stop continuation may have acknowledged one action while Explorer is
+  // durably recording the next. Give that handoff a bounded grace period; unlike
+  // the initial Stop wait it does not create a new user-facing waiting window.
   if (mode === "pre-tool-use" || claim.kind !== "empty") return;
-  if (!appendDelivery(runtime, hookInput, "waiting", undefined, {
-    queueDepth: 0,
-    lastOrder: claim.lastOrder,
-  })) {
-    return;
+  if (!activeStop) {
+    if (!appendDelivery(runtime, hookInput, "waiting", undefined, {
+      queueDepth: 0,
+      lastOrder: claim.lastOrder,
+    })) {
+      return;
+    }
   }
 
-  const waitMs = envMs("WEBMCP_HOOK_STOP_WAIT_MS", DEFAULT_STOP_WAIT_MS, 25, 30_000);
+  const waitMs = activeStop
+    ? envMs("WEBMCP_HOOK_ACTIVE_STOP_WAIT_MS", DEFAULT_ACTIVE_STOP_WAIT_MS, 25, 30_000)
+    : envMs("WEBMCP_HOOK_STOP_WAIT_MS", DEFAULT_STOP_WAIT_MS, 25, 30_000);
   const pollMs = envMs("WEBMCP_HOOK_POLL_MS", DEFAULT_POLL_MS, 10, 2_000);
   const deadline = performance.now() + waitMs;
   let lastOrder = claim.lastOrder;
@@ -1455,7 +1472,9 @@ async function main(): Promise<void> {
     if (claim.kind !== "empty") return;
     lastOrder = claim.lastOrder;
   }
-  appendDelivery(runtime, hookInput, "timeout", undefined, { queueDepth: 0, lastOrder });
+  if (!activeStop) {
+    appendDelivery(runtime, hookInput, "timeout", undefined, { queueDepth: 0, lastOrder });
+  }
 }
 
 try {

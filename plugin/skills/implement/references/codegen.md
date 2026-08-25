@@ -1,4 +1,4 @@
-# Codegen — `@nekuda/webmcp-sdk` v0.4.0 (contract v1)
+# Codegen — `@nekuda/webmcp-sdk` v0.5.0 (contract v1)
 
 Add the SDK dependency per `references/sdk.md` and use the **resolved name** it defines — the installed package's own declared name — in every import and config below; the samples here spell it `@nekuda/webmcp-sdk`. Generated code imports **only** `defineTool` / `registerTools` — never the raw browser surface, never a bundled polyfill. The SDK owns surface detection (which global the browser exposes) and no-ops gracefully when unsupported, so generated code makes no browser-surface claims of its own. (The concrete surface names live only in `references/verify.md`.)
 
@@ -24,7 +24,12 @@ Side-effect-free: validates eagerly and throws `TypeError` at module load on a b
 - Duplicate `name` or `stableKey` in one batch throws — **one batch per registration scope**.
 
 ## Two-module shape (the connect-later guarantee)
-Connecting the site to the platform later (keys, telemetry) touches wrapper config only — these modules never change. Do **not** add keys or telemetry; not part of this surface.
+The SDK's documented anonymous usage observations are default-on and independent of Connect.
+Connecting the site to the platform later changes only the entry-module wrapper config, adding
+`tracking.apiKey` to its existing `registerTools` options; tool modules never change. Do **not**
+add that publishable key during tool generation — the optional post-build flow in
+`references/connect.md` owns it after Connect reports the edge ready and the CLI confirms
+readiness.
 
 ```ts
 // <srcroot>/webmcp/tools/cart.ts  — generated tool module (no side effects)
@@ -72,6 +77,15 @@ For a delete/cancel with no payment step, use a **prepare→confirm** pair: `pre
 
 ## Entry modules — one per registration scope
 
+Resolve the exact workspace-relative entry-module path during Phase C. In an interactive run,
+record it as `plan.json.entry_module` before proposal and create or update exactly that path after
+submit. Connect later reuses this recorded path; it never searches the workspace for a plausible
+`registerTools` call.
+
+Resolve each tool module at the same time and record its workspace-relative POSIX path as that
+suggestion's `source_module`. Generate and revise exactly that file, then derive the Explorer's
+review copy from it; never treat `.webmcp/<id>.code.md` as an authoring source.
+
 **React SPA / Vite** — a provider at app root; lifetime tied to the component:
 ```tsx
 // <srcroot>/webmcp/WebmcpProvider.tsx
@@ -114,6 +128,12 @@ import { askSite } from "./tools/site";
 const reg = registerTools([askSite]);
 addEventListener("pagehide", () => reg.unregister(), { once: true });
 ```
+
+For an unbundled static site, `entry_module` is the browser-served module itself (for example,
+`public/webmcp/entry.js`), not an authoring module left outside the served asset root. Keep every
+relative import in that browser graph beneath the same served root. After a cold server restart,
+load the declared page and require every module request in the graph to return 2xx before claiming
+registration verification.
 
 Auth/role-gated scopes: put the register/unregister on an effect (or conditional include) keyed on the app's existing session/role state — see `references/wiring.md`.
 

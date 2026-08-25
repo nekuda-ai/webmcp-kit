@@ -27,6 +27,7 @@ export const REQUEST_TYPES = [
   "submit",
   "approve",
   "cancel",
+  "connect",
 ] as const;
 export type RequestType = (typeof REQUEST_TYPES)[number];
 
@@ -34,6 +35,7 @@ export type CanonicalPayload =
   | { suggestion: string; picked: boolean }
   | { suggestion: string | null; text: string }
   | { picks: Array<{ suggestion: string; note: string }> }
+  | { action: "connect" | "skip" }
   | Record<string, never>;
 
 export interface RecordedEnvelope {
@@ -137,6 +139,11 @@ function canonicalPayload(type: RequestType, payload: unknown): CanonicalPayload
       picks.push({ suggestion: pick.suggestion, note: pick.note });
     }
     return { picks };
+  }
+  if (type === "connect") {
+    if (!hasOnlyKeys(payload, ["action"])) return null;
+    if (payload.action !== "connect" && payload.action !== "skip") return null;
+    return { action: payload.action };
   }
   if (!hasOnlyKeys(payload, [])) return null;
   return {};

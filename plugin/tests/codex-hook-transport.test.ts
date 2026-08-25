@@ -195,6 +195,7 @@ function launchInput(target: LaunchFixture, sessionId: string, resume = false) {
 function defaultPayload(type: string) {
   if (type === "comment" || type === "feedback") return { suggestion: null, text: "Test note" };
   if (type === "submit") return { picks: [] };
+  if (type === "connect") return { action: "connect" };
   return {};
 }
 
@@ -753,6 +754,23 @@ test("PreToolUse delivers additional context without a tool decision", async () 
   });
 });
 
+test("PreToolUse delivers a canonical Connect decision", async () => {
+  const target = fixture();
+  appendEvent(target, event(target.runId, EVENT_ONE, 1, "connect", { action: "connect" }));
+
+  const result = await invoke("pre-tool-use", input(target, "PreToolUse"), target.pluginData);
+  const context = outputJson(result).hookSpecificOutput.additionalContext as string;
+
+  expect(context).toContain(`"event_id":"${EVENT_ONE}"`);
+  expect(context).toContain('"type":"connect"');
+  expect(context).toContain('"action":"connect"');
+  expect(delivery(target).at(-1)).toMatchObject({
+    run_id: target.runId,
+    event_id: EVENT_ONE,
+    state: "claimed",
+  });
+});
+
 test("Stop delivers the continuation schema and honors stop_hook_active", async () => {
   const target = fixture();
   appendEvent(target, event(target.runId, EVENT_ONE, 1, "submit", { picks: [] }));
@@ -765,9 +783,62 @@ test("Stop delivers the continuation schema and honors stop_hook_active", async 
     "stop",
     input(target, "Stop", { stop_hook_active: true, session_id: "session-b" }),
     target.pluginData,
+    { WEBMCP_HOOK_ACTIVE_STOP_WAIT_MS: "25" },
   );
   expect(active).toMatchObject({ code: 0, stdout: "", stderr: "" });
   expect(active.elapsedMs).toBeLessThan(1_000);
+});
+
+test("an active Stop repeatedly catches submit recorded just after the prior acknowledgement", async () => {
+  const target = fixture();
+  appendEvent(target, event(target.runId, EVENT_ONE, 1, "comment"));
+  const first = await invoke("stop", input(target, "Stop"), target.pluginData);
+  expect(outputJson(first)).toMatchObject({ decision: "block" });
+  acknowledge(target, EVENT_ONE);
+
+  for (let order = 2; order <= 21; order += 1) {
+    const eventId = crypto.randomUUID();
+    const continued = invoke(
+      "stop",
+      input(target, "Stop", { stop_hook_active: true }),
+      target.pluginData,
+      {
+        WEBMCP_HOOK_ACTIVE_STOP_WAIT_MS: "250",
+        WEBMCP_HOOK_POLL_MS: "10",
+      },
+    );
+    await Bun.sleep(20);
+    appendEvent(target, event(target.runId, eventId, order, "submit", { picks: [] }));
+    const delivered = await continued;
+    expect(outputJson(delivered)).toMatchObject({ decision: "block" });
+    expect(JSON.parse(delivered.stdout).reason).toContain(`"event_id":"${eventId}"`);
+    acknowledge(target, eventId);
+  }
+
+  expect(delivery(target).filter((entry) => entry.state === "claimed")).toHaveLength(21);
+}, 20_000);
+
+test("an active Stop continuation delivers the next already-queued action", async () => {
+  const target = fixture();
+  appendEvent(target, event(target.runId, EVENT_ONE, 1, "comment"));
+
+  const first = await invoke("stop", input(target, "Stop"), target.pluginData);
+  expect(outputJson(first)).toMatchObject({ decision: "block" });
+  acknowledge(target, EVENT_ONE);
+  appendEvent(target, event(target.runId, EVENT_TWO, 2, "submit", { picks: [] }));
+
+  const continued = await invoke(
+    "stop",
+    input(target, "Stop", { stop_hook_active: true }),
+    target.pluginData,
+  );
+  expect(outputJson(continued)).toMatchObject({ decision: "block" });
+  expect(JSON.parse(continued.stdout).reason).toContain(`"event_id":"${EVENT_TWO}"`);
+  expect(delivery(target).at(-1)).toMatchObject({
+    state: "claimed",
+    event_id: EVENT_TWO,
+    order: 2,
+  });
 });
 
 test("private state binds one immutable session to the canonical workspace and run", async () => {
