@@ -9,6 +9,8 @@ This is a real, deliberately small website for exercising the WebMCP Kit impleme
 - reset semantics: the local inventory can always be restored to its seed state.
 
 The server and smoke test use Node built-ins only. There is no install step and no network dependency.
+The server serves generated browser modules from any nested path beneath `public/`, matching the
+two-module WebMCP code-generation shape.
 
 ## Start it
 

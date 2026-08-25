@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,11 +8,34 @@ import assert from "node:assert/strict";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "reading-room-smoke-"));
 const stateFile = join(temporaryDirectory, "state.json");
+const publicDirectory = join(temporaryDirectory, "public");
+await cp(join(ROOT, "public"), publicDirectory, { recursive: true });
+await mkdir(join(publicDirectory, "webmcp"));
+await mkdir(join(publicDirectory, "webmcp", "tools"));
+await writeFile(
+  join(publicDirectory, "webmcp", "entry.js"),
+  'import { generated } from "./tools/read.mjs";\nexport { generated };\n',
+);
+await writeFile(join(publicDirectory, "webmcp", "tools", "read.mjs"), 'export const generated = "served";\n');
+const indexPath = join(publicDirectory, "index.html");
+await writeFile(
+  indexPath,
+  (await readFile(indexPath, "utf8")).replace(
+    "</head>",
+    '    <script type="module" src="/webmcp/entry.js"></script>\n  </head>',
+  ),
+);
 
 function startServer() {
   const child = spawn(process.execPath, [join(ROOT, "server.mjs")], {
     cwd: ROOT,
-    env: { ...process.env, HOST: "127.0.0.1", PORT: "0", STATE_FILE: stateFile },
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: "0",
+      PUBLIC_DIR: publicDirectory,
+      STATE_FILE: stateFile,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let stderr = "";
@@ -65,8 +88,31 @@ try {
   const homepage = await homepageResponse.text();
   assert.equal(homepageResponse.status, 200);
   assert.match(homepageResponse.headers.get("content-type") || "", /^text\/html/);
+  assert.match(
+    homepageResponse.headers.get("content-security-policy") || "",
+    /(?:^|;\s*)connect-src 'self' https:\/\/ingest\.agentlane\.dev(?:;|$)/,
+  );
   assert.match(homepage, /<h1[^>]*>Useful things for/);
-  console.log("ok: browser entry page");
+  console.log("ok: browser entry page permits SDK telemetry ingest");
+
+  const entryPath = /<script type="module" src="([^"]*webmcp[^"]*)"><\/script>/.exec(homepage)?.[1];
+  assert.equal(entryPath, "/webmcp/entry.js");
+  const entryResponse = await fetch(new URL(entryPath, base));
+  assert.equal(entryResponse.status, 200);
+  assert.match(entryResponse.headers.get("content-type") || "", /^text\/javascript/);
+  const entrySource = await entryResponse.text();
+  const importedPath = /from "([^"]+)"/.exec(entrySource)?.[1];
+  assert.equal(importedPath, "./tools/read.mjs");
+  const importedResponse = await fetch(new URL(importedPath, entryResponse.url));
+  assert.equal(importedResponse.status, 200);
+  assert.match(importedResponse.headers.get("content-type") || "", /^text\/javascript/);
+  assert.equal(await importedResponse.text(), 'export const generated = "served";\n');
+  console.log("ok: the browser-visible generated module graph is served");
+
+  const malformedResponse = await fetch(`${base}/bad%`);
+  assert.equal(malformedResponse.status, 400);
+  assert.deepEqual(await malformedResponse.json(), { error: "URL path has malformed percent encoding" });
+  console.log("ok: malformed static paths fail with 400");
 
   const initial = await json(base, "/api/catalog?q=warm&available=true");
   assert.equal(initial.products.length, 1);

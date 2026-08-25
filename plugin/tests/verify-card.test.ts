@@ -95,8 +95,8 @@ test("run-level finish steps fold latest-wins", () => {
   const { runSteps } = fold([
     ...buildLines,
     approve,
-    { ts: "2026-08-18T10:12:00Z", run_step: "pr", state: "start" },
-    { ts: "2026-08-18T10:12:30Z", run_step: "pr", state: "done" },
+    { ts: "2026-08-18T10:12:00Z", run: "pr", state: "start" },
+    { ts: "2026-08-18T10:12:30Z", run: "pr", state: "done" },
   ]);
   expect(runSteps.get("pr")).toEqual({ state: "done" });
 });

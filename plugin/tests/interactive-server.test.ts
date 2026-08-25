@@ -385,6 +385,51 @@ test("validates envelopes, records durably before ack, orders bursts, and relays
   await stop(proc, run);
 }, 15_000);
 
+test("connect decisions are canonical, durable, and actionable", async () => {
+  const workspace = temporaryWorkspace();
+  const { proc, run } = await start(workspace);
+  const page = await connect(run, "page");
+  const claude = await connect(run, "claude");
+  await page.next((message) => message.type === "snapshot", "connect snapshot");
+
+  for (const [requestId, payload] of [
+    ["missing-action", {}],
+    ["unknown-action", { action: "later" }],
+    ["extra-action", { action: "connect", extra: true }],
+  ] as const) {
+    page.socket.send(JSON.stringify({ request_id: requestId, type: "connect", payload }));
+    expect(
+      await page.next((message) => message.request_id === requestId, `${requestId} rejected`),
+    ).toMatchObject({ type: "error", request_id: requestId });
+  }
+
+  page.socket.send(
+    JSON.stringify({ request_id: "connect-now", type: "connect", payload: { action: "connect" } }),
+  );
+  const recorded = await page.next(
+    (message) => message.request_id === "connect-now",
+    "connect recorded",
+  );
+  expect(recorded).toMatchObject({ type: "recorded", order: 1 });
+  const envelope = await claude.next(
+    (message) => message.type === "connect",
+    "connect relayed",
+  );
+  expect(envelope).toEqual({
+    event_id: recorded.event_id,
+    run_id: run.run_id,
+    order: 1,
+    type: "connect",
+    ts: expect.any(String),
+    payload: { action: "connect" },
+  });
+  expect(feedback(workspace)).toEqual([envelope]);
+
+  page.socket.close();
+  claude.socket.close();
+  await stop(proc, run);
+}, 10_000);
+
 test("aggregate journal ceiling rejects crossing before ack and preserves hook-readable history", async () => {
   const workspace = temporaryWorkspace();
   const testLimit = 1_600;
@@ -676,6 +721,164 @@ test("250 ms reconciliation publishes atomic replacements and ack helper is idem
   page.socket.close();
   await stop(proc, run);
 }, 15_000);
+
+test("submit acknowledgement requires the durable build-start acceptance effect", async () => {
+  const workspace = temporaryWorkspace();
+  const { proc, run } = await start(workspace);
+  const page = await connect(run, "page");
+  await page.next((message) => message.type === "snapshot", "snapshot");
+  page.socket.send(
+    JSON.stringify({
+      request_id: "submit-effect",
+      type: "submit",
+      payload: { picks: [{ suggestion: "ask_site", note: "" }] },
+    }),
+  );
+  const recorded = await page.next(
+    (message) => message.request_id === "submit-effect",
+    "submit recorded",
+  );
+  const premature = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(premature.exitCode).toBe(1);
+  expect(new TextDecoder().decode(premature.stderr)).toContain(
+    "submit effect has no durable phase-build and first code-start records",
+  );
+
+  appendFileSync(
+    join(workspace, ".webmcp", "_status.ndjson"),
+    '{"phase":"build"}\n{"suggestion":"ask_site","step":"code","state":"start"}\n',
+  );
+  const accepted = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(accepted.exitCode).toBe(0);
+
+  page.socket.close();
+  await stop(proc, run);
+}, 10_000);
+
+test("feedback acknowledgement requires the real module to match its review copy", async () => {
+  const workspace = temporaryWorkspace();
+  const { proc, run } = await start(workspace);
+  const page = await connect(run, "page");
+  await page.next((message) => message.type === "snapshot", "snapshot");
+  mkdirSync(join(workspace, "src", "webmcp"), { recursive: true });
+  writeFileSync(
+    join(workspace, ".webmcp", "plan.json"),
+    JSON.stringify({
+      suggestions: [{ id: "ask-site", source_module: "src/webmcp/ask-site.ts" }],
+    }),
+  );
+  mkdirSync(join(workspace, "src", "webmcp", "decoy"), { recursive: true });
+  writeFileSync(
+    join(workspace, "src", "webmcp", "decoy", "ask-site.ts"),
+    "export const value = 2;\n",
+  );
+  writeFileSync(join(workspace, "src", "webmcp", "ask-site.ts"), "export const value = 1;\n");
+  writeFileSync(join(workspace, ".webmcp", "ask-site.code.md"), "export const value = 2;\n");
+  page.socket.send(
+    JSON.stringify({
+      request_id: "feedback-effect",
+      type: "feedback",
+      payload: { suggestion: "ask-site", text: "change the value" },
+    }),
+  );
+  const recorded = await page.next(
+    (message) => message.request_id === "feedback-effect",
+    "feedback recorded",
+  );
+  const premature = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(premature.exitCode).toBe(1);
+  expect(new TextDecoder().decode(premature.stderr)).toContain(
+    "feedback effect must update the suggestion's exact plan.json source_module first",
+  );
+
+  writeFileSync(join(workspace, "src", "webmcp", "ask-site.ts"), "export const value = 2;\n");
+  const accepted = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(accepted.exitCode).toBe(0);
+
+  page.socket.close();
+  await stop(proc, run);
+}, 10_000);
+
+test("approval acknowledgement requires relative imports in a public browser graph", async () => {
+  const workspace = temporaryWorkspace();
+  const { proc, run } = await start(workspace);
+  const page = await connect(run, "page");
+  await page.next((message) => message.type === "snapshot", "snapshot");
+  mkdirSync(join(workspace, "public", "webmcp"), { recursive: true });
+  writeFileSync(
+    join(workspace, ".webmcp", "plan.json"),
+    JSON.stringify({ entry_module: "public/webmcp/entry.js", suggestions: [] }),
+  );
+  writeFileSync(
+    join(workspace, "public", "webmcp", "entry.js"),
+    'import { askSite } from "./ask-site.js";\nvoid askSite;\n',
+  );
+  writeFileSync(
+    join(workspace, "public", "webmcp", "ask-site.js"),
+    'import { defineTool } from "@nekuda/webmcp-sdk";\nexport const askSite = defineTool;\n',
+  );
+  writeFileSync(join(workspace, "public", "index.html"), "<!doctype html><title>Site</title>\n");
+  page.socket.send(JSON.stringify({ request_id: "approval-delivery", type: "approve", payload: {} }));
+  const recorded = await page.next(
+    (message) => message.request_id === "approval-delivery",
+    "approval recorded",
+  );
+  const rejected = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(rejected.exitCode).toBe(1);
+  expect(new TextDecoder().decode(rejected.stderr)).toContain(
+    'browser-unresolvable bare import "@nekuda/webmcp-sdk" in public/webmcp/ask-site.js',
+  );
+
+  writeFileSync(
+    join(workspace, "public", "index.html"),
+    '<script type="importmap">{"imports":{"@nekuda/webmcp-sdk":"/vendor/webmcp-sdk.js"}}</script>\n',
+  );
+  const stillRejected = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(stillRejected.exitCode).toBe(1);
+  expect(new TextDecoder().decode(stillRejected.stderr)).toContain(
+    'browser-unresolvable bare import "@nekuda/webmcp-sdk" in public/webmcp/ask-site.js',
+  );
+
+  mkdirSync(join(workspace, "public", "vendor"), { recursive: true });
+  writeFileSync(
+    join(workspace, "public", "webmcp", "ask-site.js"),
+    'import { defineTool } from "../vendor/webmcp-sdk.js";\nexport const askSite = defineTool;\n',
+  );
+  writeFileSync(join(workspace, "public", "vendor", "webmcp-sdk.js"), "export const defineTool = {};\n");
+  const accepted = Bun.spawnSync({
+    cmd: [process.execPath, ackEntry, workspace, run.run_id, String(recorded.event_id)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(accepted.exitCode).toBe(0);
+
+  page.socket.close();
+  await stop(proc, run);
+}, 10_000);
 
 test("a symlinked state directory is rejected without touching its target", async () => {
   const workspace = temporaryWorkspace();

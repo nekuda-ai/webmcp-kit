@@ -36,7 +36,7 @@ import {
   type RunFileV1,
 } from "./protocol";
 
-const ACTIONABLE = new Set(["comment", "feedback", "submit", "approve", "cancel"]);
+const ACTIONABLE = new Set(["comment", "feedback", "submit", "approve", "cancel", "connect"]);
 const MAX_RUNTIME_BYTES = 16 * 1024;
 
 function testDuration(name: string, fallback: number): number {

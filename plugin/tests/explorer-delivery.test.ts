@@ -130,6 +130,104 @@ test("socket and requests carry the canonical capability/run envelope", async ()
   expect(await h.page.locator("#toast").textContent()).toBe("Saving…");
 });
 
+test("the post-build card records Connect and renders run-level success with locked copy", async () => {
+  const h = await harness();
+  const connectedPlan = JSON.stringify({
+    journey: "A visitor searches the docs",
+    site: "example.test",
+    suggestions: [
+      { id: "search", name: "Search", description: "Search docs", why: "Visitors need answers.", status: "approved", params: [] },
+      { id: "reserve", name: "Reserve", description: "Reserve an item", why: "Visitors need to act.", status: "approved", params: [] },
+    ],
+  });
+  const offer = [
+    { ts: "2026-08-21T12:00:00.000Z", phase: "verify" },
+    { ts: "2026-08-21T12:00:01.000Z", run: "connect", state: "offer" },
+  ];
+  await h.snapshot({
+    "plan.json": connectedPlan,
+    "_status.ndjson": `${offer.map((line) => JSON.stringify(line)).join("\n")}\n`,
+  });
+
+  const card = h.page.locator("#connectStage");
+  expect(await card.isVisible()).toBe(true);
+  expect(await h.page.locator("#connectTitle").textContent()).toBe(
+    "Connect WebMCP Kit to AgentLane",
+  );
+  expect(await h.page.locator("#startConnect").textContent()).toBe("Connect to AgentLane");
+  expect(await h.page.locator("#skipConnect").textContent()).toBe("Skip for now");
+  expect(await h.page.locator("#connectCopy").textContent()).toBe(
+    "See registered tools and their activity in AgentLane. Your built tools stay in this project.",
+  );
+  expect((await card.textContent()) ?? "").not.toMatch(
+    /\b(?:mint|token|scope|telemetry|api[ -]?key|origin)\b/i,
+  );
+
+  await h.page.locator("#startConnect").click();
+  const request = await h.lastRequest();
+  expect(request).toMatchObject({ type: "connect", payload: { action: "connect" } });
+  await h.emit({
+    type: "recorded",
+    request_id: request.request_id,
+    event_id: "connect-a",
+    run_id: "run-a",
+    order: 1,
+  });
+  expect(await h.page.locator("#startConnect").isDisabled()).toBe(true);
+
+  await h.snapshot({
+    "plan.json": connectedPlan,
+    "_status.ndjson": `${offer.map((line) => JSON.stringify(line)).join("\n")}\n${JSON.stringify({ ts: "2026-08-21T12:00:02.500Z", run: "connect", state: "start" })}\n`,
+  });
+  expect(await h.page.locator("#startConnect").textContent()).toBe("Connecting…");
+  expect(await h.page.locator("#connectStage").getAttribute("aria-busy")).toBe("true");
+  expect(await h.page.locator("#connectCopy").textContent()).toContain(
+    "Finish the secure browser sign-in",
+  );
+
+  const decision = JSON.stringify({
+    event_id: "connect-a",
+    run_id: "run-a",
+    order: 1,
+    type: "connect",
+    ts: "2026-08-21T12:00:02.000Z",
+    payload: { action: "connect" },
+  });
+  await h.snapshot({
+    "plan.json": connectedPlan,
+    "_status.ndjson": `${offer.map((line) => JSON.stringify(line)).join("\n")}\n${JSON.stringify({ ts: "2026-08-21T12:00:02.500Z", run: "connect", state: "start" })}\n${JSON.stringify({ ts: "2026-08-21T12:00:03.000Z", run: "connect", state: "done" })}\n`,
+    "_feedback.ndjson": `${decision}\n`,
+    "_ack.ndjson": `${JSON.stringify({ ts: "2026-08-21T12:00:04.000Z", run_id: "run-a", event_id: "connect-a", status: "handled" })}\n`,
+  });
+  expect(await h.page.locator("#connectTitle").textContent()).toBe(
+    "Connected — 2 tools ready",
+  );
+  expect(await h.page.locator("#connectActions").isHidden()).toBe(true);
+});
+
+test("Skip for now is a durable connect decision and closes the card", async () => {
+  const h = await harness();
+  const status = [
+    { ts: "2026-08-21T12:00:00.000Z", phase: "verify" },
+    { ts: "2026-08-21T12:00:01.000Z", run: "connect", state: "offer" },
+  ];
+  await h.snapshot({
+    "plan.json": plan.replace('"proposed"', '"approved"'),
+    "_status.ndjson": `${status.map((line) => JSON.stringify(line)).join("\n")}\n`,
+  });
+  await h.page.locator("#skipConnect").click();
+  expect(await h.lastRequest()).toMatchObject({
+    type: "connect",
+    payload: { action: "skip" },
+  });
+  await h.snapshot({
+    "plan.json": plan.replace('"proposed"', '"approved"'),
+    "_status.ndjson": `${status.map((line) => JSON.stringify(line)).join("\n")}\n${JSON.stringify({ ts: "2026-08-21T12:00:02.000Z", run: "connect", state: "skipped" })}\n`,
+  });
+  await h.page.locator("#connectStage").waitFor({ state: "hidden" });
+  expect(await h.page.locator("#connectStage").isHidden()).toBe(true);
+});
+
 test("a pick changes only after recorded and a rejected request can be retried", async () => {
   const h = await harness();
   await h.snapshot({ "plan.json": plan, "_status.ndjson": '{"phase":"propose"}\n' });
@@ -163,9 +261,9 @@ test("recorded clears the input, delivery still waits, and handled needs an ack"
   await h.emit({ type: "recorded", request_id: sent.request_id, event_id: "event-a", run_id: "run-a", order: 7 });
   expect(await h.page.locator("#convInput").inputValue()).toBe("");
   const savedCopy = await h.page.locator("#toast").textContent() ?? "";
-  expect(savedCopy).toContain("original Codex task");
+  expect(savedCopy).toContain("original agent task");
   expect(savedCopy).toContain("different task must reconcile it manually");
-  expect(savedCopy).not.toContain("waiting for Codex");
+  expect(savedCopy).not.toContain("waiting for this run");
   expect(savedCopy).not.toContain("/hooks");
 
   const feedback = `${JSON.stringify({
@@ -178,7 +276,7 @@ test("recorded clears the input, delivery still waits, and handled needs an ack"
     "_feedback.ndjson": feedback,
     "_delivery.ndjson": `${JSON.stringify({ run_id: "run-a", event_id: "event-a", status: "claimed" })}\n`,
   });
-  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s agent task");
 
   await h.snapshot({
     "plan.json": plan,
@@ -187,8 +285,8 @@ test("recorded clears the input, delivery still waits, and handled needs an ack"
     "_delivery.ndjson": `${JSON.stringify({ run_id: "run-a", event_id: "event-a", status: "claimed" })}\n`,
     "_ack.ndjson": `${JSON.stringify({ ts: "2026-08-18T12:00:01.000Z", run_id: "run-a", event_id: "event-a", status: "handled" })}\n`,
   });
-  expect(await h.page.locator("#statusBox").textContent()).toBe("Handled by Codex");
-  expect(await h.page.locator("#toast").textContent()).toBe("Handled by Codex");
+  expect(await h.page.locator("#statusBox").textContent()).toBe("Handled by the agent");
+  expect(await h.page.locator("#toast").textContent()).toBe("Handled by the agent");
 });
 
 test("submit and approval show Saving until recorded, with no celebration", async () => {
@@ -241,7 +339,7 @@ test("a recorded approval remains disabled and truthful after a real page reload
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Approval saved");
   expect(await h.page.locator("#primaryAction").isDisabled()).toBe(true);
   expect(await h.sentCount()).toBe(0);
-  expect(await h.page.locator("#statusBox").textContent()).toContain("original Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("original agent task");
 
   await h.snapshot({
     ...files,
@@ -250,7 +348,7 @@ test("a recorded approval remains disabled and truthful after a real page reload
     })}\n`,
   });
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Approved");
-  expect(await h.page.locator("#statusBox").textContent()).toContain("Approval handled by Codex");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("Approval handled by the agent");
 });
 
 test("a submit appended before disconnect reconciles only from an exact refreshed journal", async () => {
@@ -293,7 +391,7 @@ test("a submit appended before disconnect reconciles only from an exact refreshe
     "_feedback.ndjson": `${[...unsafe, recorded].map((event) => JSON.stringify(event)).join("\n")}\n`,
   });
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Plan submitted");
-  expect(await h.page.locator("#statusBox").textContent()).toContain("original Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("original agent task");
 });
 
 test("a genuinely lost submit becomes explicitly retryable after bounded reconciliation", async () => {
@@ -382,7 +480,7 @@ test("an approval appended before disconnect reconciles on the refreshed journal
   });
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Approval saved");
   expect(await h.page.locator("#primaryAction").isDisabled()).toBe(true);
-  expect(await h.page.locator("#statusBox").textContent()).toContain("original Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("original agent task");
 });
 
 test("a run-level timeout applies to later actions until delivery supersedes it", async () => {
@@ -413,7 +511,7 @@ test("a run-level timeout applies to later actions until delivery supersedes it"
     })}\n`,
   });
   status = await h.page.locator("#statusBox").textContent() ?? "";
-  expect(status).toBe("Saved — waiting for this run’s Codex task");
+  expect(status).toBe("Saved — waiting for this run’s agent task");
 
   const later = {
     event_id: "event-later", run_id: "run-a", order: 10, type: "comment",
@@ -427,7 +525,7 @@ test("a run-level timeout applies to later actions until delivery supersedes it"
       run_id: "run-a", state: "waiting", queue_depth: 0, last_order: 9,
     })}\n`,
   });
-  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s agent task");
 });
 
 test("an eventless run error overrides waiting without replacing event-specific delivery", async () => {
@@ -449,7 +547,7 @@ test("an eventless run error overrides waiting without replacing event-specific 
   });
   let status = await h.page.locator("#statusBox").textContent() ?? "";
   expect(status).toContain("automatic delivery needs attention");
-  expect(status).toContain("original Codex task");
+  expect(status).toContain("original agent task");
 
   await h.snapshot({
     ...files,
@@ -457,7 +555,7 @@ test("an eventless run error overrides waiting without replacing event-specific 
       run_id: "run-a", event_id: "event-after-wait", order: 8, state: "claimed",
     })}\n`,
   });
-  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s agent task");
 
   const later = {
     event_id: "event-after-new-wait", run_id: "run-a", order: 10, type: "comment",
@@ -470,7 +568,7 @@ test("an eventless run error overrides waiting without replacing event-specific 
       run_id: "run-a", state: "waiting", queue_depth: 0, last_order: 9,
     })}\n`,
   });
-  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s Codex task");
+  expect(await h.page.locator("#statusBox").textContent()).toBe("Saved — waiting for this run’s agent task");
 });
 
 test("reduced motion leaves every ongoing activity indicator static", async () => {
@@ -526,4 +624,89 @@ test("disconnect distinguishes uncertain sends from durable recorded actions", a
     "Disconnected — locally pending sends may not be saved. Already recorded actions remain durable.",
   );
   expect(await h.page.locator("#convInput").inputValue()).toBe("Pending locally");
+});
+
+// ── Scope grouping (rendered-DOM half; pure grouping logic: explorer-scope.test.ts) ──
+// Where a tool registers is part of the reviewed contract: the map must group
+// tools under scope nodes, outline rows must carry a scope chip, and a missing
+// `availability` must surface as "Scope not declared" — never a silent site-wide.
+const scopedPlan = JSON.stringify({
+  journey: "A visitor shops and RSVPs",
+  site: "example.test",
+  suggestions: [
+    { id: "ask", name: "ask_site", description: "Answer questions", why: "Visitors ask.", status: "proposed", availability: { scope: "everywhere" }, params: [] },
+    { id: "rsvp", name: "rsvp_to_event", description: "Hold seats", why: "Events fill.", status: "proposed", availability: { scope: "page", where: "/events/[id]", note: "always books the event being viewed" }, params: [] },
+    { id: "checkout", name: "start_checkout", description: "Go to checkout", why: "Carts convert.", status: "proposed", availability: { scope: "everywhere", when: "cart has items", note: "unregisters when the cart empties" }, params: [] },
+    { id: "mystery", name: "mystery_tool", description: "Does something", why: "Unclear.", status: "proposed", params: [] },
+  ],
+});
+
+async function scopedHarness(): Promise<Harness> {
+  const h = await harness();
+  await h.snapshot({ "plan.json": scopedPlan, "_status.ndjson": '{"phase":"propose"}\n' });
+  await h.page.waitForSelector("#tools .scope-node");
+  return h;
+}
+
+test("the map renders one scope node per group with its tools underneath", async () => {
+  const h = await scopedHarness();
+  const grouped = await h.page.evaluate(() =>
+    Array.from(document.querySelectorAll("#tools .scope-group"))
+      .filter((g) => g.querySelector(".scope-node")) // the ghost "Request tool" row borrows the grid
+      .map((g) => ({
+      label: g.querySelector(".scope-label")?.textContent,
+      count: g.querySelector(".page-count")?.textContent,
+      tools: Array.from(g.querySelectorAll(".scope-tools .tool[data-suggestion]"))
+        .map((t) => t.getAttribute("data-suggestion")),
+    })),
+  );
+  expect(grouped).toEqual([
+    { label: "Site-wide", count: "2", tools: ["ask", "checkout"] },
+    { label: "/events/[id]", count: "1", tools: ["rsvp"] },
+    { label: "Scope not declared", count: "1", tools: ["mystery"] },
+  ]);
+  // A condition never forms a group — the conditional tool sits under its scope
+  // with a marker on the card instead.
+  expect(await h.page.locator('#tools .tool[data-suggestion="checkout"] .cond-mark').count()).toBe(1);
+  expect(await h.page.locator("#tools .cond-mark").count()).toBe(1);
+  // Every tool still gets a connector, now via its scope node: 3 site→scope,
+  // 4 scope→tool. Links draw on requestAnimationFrame, so wait for the frame
+  // rather than counting immediately.
+  await h.page.waitForFunction(() => document.querySelectorAll("#mapLinks path").length === 7);
+});
+
+test("outline cards group rows by scope and the detail pane states where the tool lives", async () => {
+  const h = await scopedHarness();
+  await h.page.locator('[data-view="outline"]').click();
+  // Scope is the card a row sits in: everywhere-tools under the Global card,
+  // page tools under their route's card, undeclared under its own card.
+  expect((await h.page.locator('#outline .outline-card.tg-everywhere .outline-card-title').textContent())?.trim())
+    .toBe("Global");
+  expect(await h.page.locator('#outline .outline-card.tg-everywhere [data-suggestion="checkout"]').count()).toBe(1);
+  expect((await h.page.locator('#outline .outline-card.tg-page:has([data-suggestion="rsvp"]) .outline-route').textContent())?.trim())
+    .toBe("/events/[id]");
+  expect(await h.page.locator('#outline .outline-card.tg-undeclared [data-suggestion="mystery"]').count()).toBe(1);
+
+  await h.page.locator('#outline [data-suggestion="rsvp"]').click();
+  const detail = (await h.page.locator("#content .scope-field").textContent()) ?? "";
+  expect(detail).toContain("Where it lives");
+  expect(detail).toContain("/events/[id]");
+  expect(detail).toContain("always books the event being viewed");
+
+  await h.page.locator('#outline [data-suggestion="checkout"]').click();
+  const conditional = (await h.page.locator("#content .scope-field").textContent()) ?? "";
+  expect(conditional).toContain("Only while cart has items");
+  expect(conditional).toContain("unregisters when the cart empties");
+
+  await h.page.locator('#outline [data-suggestion="mystery"]').click();
+  const undeclared = (await h.page.locator("#content .scope-field").textContent()) ?? "";
+  expect(undeclared).toContain("does not declare where this tool registers");
+});
+
+test("availability is a first-class field, not an extras dump", async () => {
+  const h = await scopedHarness();
+  await h.page.locator('#tools .tool[data-suggestion="rsvp"]').click();
+  const content = (await h.page.locator("#content").textContent()) ?? "";
+  expect(content).not.toContain('"scope"');
+  expect(content).not.toContain("availability:");
 });
