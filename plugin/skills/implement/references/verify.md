@@ -4,8 +4,19 @@ Shared by the `verify` skill and `implement` Phase F. Every tool ends in exactly
 
 ## Environment & surface
 - Use the working directory's own runbook (lifecycle commands, base URL, test identities — e.g. an eval capsule) if it ships one; otherwise the repo's own scripts. Never assume a harness exists.
-- WebMCP must be active in the browser: **Chrome 150+ with the WebMCP flag** (`chrome://flags`, enabled for localhost) — the current surface is `document.modelContext`. On **Chrome 149** the only surface is the legacy `navigator.modelContext`. As a backup, load `@mcp-b/webmcp-polyfill`. The generated code never detects this itself — the SDK resolves whichever surface exists; here you only confirm one is present.
-- Browser automation is tool-agnostic: a chrome-devtools MCP, a CLI driver, or a guided manual check.
+- Use the plugin-owned browser CLI. On Unix resolve it without host bias:
+  ```sh
+  plugin_root="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+  if [ -z "$plugin_root" ]; then
+    skill_dir="<absolute base directory for this skill>"
+    plugin_root="$(cd "$skill_dir/../.." && pwd -P)"
+  fi
+  webmcp="${plugin_root}/scripts/webmcp.sh"
+  "$webmcp" browser status
+  ```
+  The base directory is the host-shown directory containing the active skill's `SKILL.md`; do not guess from the repository checkout. On Windows use `$env:CLAUDE_PLUGIN_ROOT`, then `$env:PLUGIN_ROOT`, then `(Resolve-Path "<absolute base directory for this skill>\..\..").Path`, and run `scripts\webmcp.cmd`. Do not ask for MCP configuration, a global CLI, Playwright, or manual driving.
+- Run `status`, then `start` once. The entry resolves `chrome-devtools-mcp@latest` and owns a host-session-scoped isolated/headless Chrome 150+, `--category-experimental-webmcp` / `--enable-features=WebMCP` flags, privacy flags, safe executable discovery, and cached Chrome for Testing fallback on platforms Chrome for Testing publishes. Set `WEBMCP_BROWSER_SESSION_ID` to any unique value for concurrent runs in one workspace; otherwise the entry scopes by the Claude/Codex session when available, then the workspace. On unsupported hosts such as Linux arm64, provide native Chrome/Chromium 150+ through `WEBMCP_BROWSER_PATH`. Use JSON output for page/tool commands; batch the ladder by page; inspect console and network; always `stop` in cleanup.
+- If startup reports a Node/npm, browser download, architecture, shared-library, or launch error, preserve the exact cause and mark browser-dependent tools **could-not-verify**. Never use `sudo`, a system package manager, or a normal Chrome profile. An interrupted run recovers with `status` then `stop` before one retry.
 
 ## Baseline first (before touching anything)
 Record whether the repo **already** typechecks/builds/boots cleanly. Capturing this is read-only, so don't leave it on the critical path: in `implement`, start the static half (typecheck/build) as a background task during Phases A–C while the repo is being read, and record the boot half when the pre-warmed dev server first comes up (rung 2) — before any entry-module wiring lands. By approval time the whole baseline is already known. If the baseline is already broken, do not attribute it to your change and do not edit unrelated code to fix it — report it and mark affected tools could-not-verify.

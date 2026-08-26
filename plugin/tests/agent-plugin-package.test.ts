@@ -103,13 +103,55 @@ function markdownFiles(directory: string): string[] {
 test("skill CLI calls resolve through the installed plugin entry", () => {
   const skills = join(pluginRoot, "skills");
   const connect = readFileSync(join(skills, "implement", "references", "connect.md"), "utf8");
+  const implementVerify = readFileSync(
+    join(skills, "implement", "references", "verify.md"),
+    "utf8",
+  );
+  const verify = readFileSync(join(skills, "verify", "SKILL.md"), "utf8");
   const entry = readFileSync(join(pluginRoot, "scripts", "webmcp.sh"), "utf8");
+  const windowsEntry = readFileSync(join(pluginRoot, "scripts", "webmcp.cmd"), "utf8");
 
   expect(connect).toContain('"${CLAUDE_PLUGIN_ROOT}/scripts/webmcp.sh"');
   expect(connect).toContain('"${PLUGIN_ROOT}/scripts/webmcp.sh"');
   expect(entry).toContain("CLAUDE_PLUGIN_ROOT");
   expect(entry).toContain("PLUGIN_ROOT");
   expect(entry).not.toContain("WEBMCP_CLI_TEST_WRAPPER");
+  expect(windowsEntry).toContain("%CLAUDE_PLUGIN_ROOT%");
+  expect(windowsEntry).toContain("%PLUGIN_ROOT%");
+  expect(windowsEntry).toContain("%plugin_root%\\cli\\webmcp.ts");
+  for (const instructions of [verify, implementVerify]) {
+    expect(instructions).toContain('plugin_root="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"');
+    expect(instructions).toContain('skill_dir="<absolute base directory for this skill>"');
+    expect(instructions).toContain('plugin_root="$(cd "$skill_dir/../.." && pwd -P)"');
+    expect(instructions).toContain('webmcp="${plugin_root}/scripts/webmcp.sh"');
+    expect(instructions).toContain('"$webmcp" browser');
+    expect(instructions).toContain("$env:CLAUDE_PLUGIN_ROOT");
+    expect(instructions).toContain("$env:PLUGIN_ROOT");
+    expect(instructions).toContain("Resolve-Path");
+    expect(instructions).toContain("scripts\\webmcp.cmd");
+    expect(instructions).not.toContain("scripts\\\\webmcp.cmd");
+    expect(instructions).not.toMatch(
+      /"\$\{(?:CLAUDE_PLUGIN_ROOT|PLUGIN_ROOT)\}\/scripts\/webmcp\.sh" browser (?:status|start)/,
+    );
+    expect(instructions).toContain("chrome-devtools-mcp@latest");
+    expect(instructions).toContain("--category-experimental-webmcp");
+    expect(instructions).toContain("--enable-features=WebMCP");
+    expect(instructions).not.toContain("tool-agnostic");
+    expect(instructions).not.toContain("guided manual");
+  }
+  for (const command of [
+    "status",
+    "start",
+    "new_page",
+    "list_webmcp_tools",
+    "execute_webmcp_tool",
+    "take_snapshot",
+    "list_console_messages",
+    "list_network_requests",
+    "stop",
+  ]) {
+    expect(verify).toContain(`browser ${command}`);
+  }
   for (const path of markdownFiles(skills)) {
     expect(readFileSync(path, "utf8")).not.toMatch(/\bwebmcp\s+(?:login|connect|status)\b/);
   }

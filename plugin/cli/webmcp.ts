@@ -1,13 +1,15 @@
 #!/usr/bin/env bun
 
 import { type ConnectOptions, connect } from "./connect";
+import { browserMain } from "./browser";
 import { CliError, type LoginOptions, login } from "./login";
 import { status } from "./status";
 
 const USAGE = `Usage:
   webmcp login [--json]
   webmcp connect --workspace <dir> [--site-url <url>] [--environment <name>] [--org <id>] [--json]
-  webmcp status --workspace <dir> [--json]`;
+  webmcp status --workspace <dir> [--json]
+  webmcp browser <command> [...args]`;
 
 type Io = {
   stdout: (value: string) => void;
@@ -55,6 +57,7 @@ function parseArgs(args: string[]): Parsed {
 }
 
 export async function main(args: string[], options: MainOptions = {}): Promise<number> {
+  if (args[0] === "browser") return browserMain(args.slice(1));
   const parsed = parseArgs(args);
   const io = options.io ?? {
     stdout: (value) => console.log(value),
