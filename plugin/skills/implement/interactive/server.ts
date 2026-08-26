@@ -75,6 +75,7 @@ const portFile = join(stateDir, ".port");
 const lastPortFile = join(stateDir, ".port.last");
 const gitignoreFile = join(stateDir, ".gitignore");
 const feedbackFile = join(stateDir, "_feedback.ndjson");
+const deliveryFile = join(stateDir, "_delivery.ndjson");
 
 function stateDirIsReal(): boolean {
   try {
@@ -442,6 +443,34 @@ function journalByteLimit(): number {
   return MAX_JOURNAL_BYTES;
 }
 
+// A subscribed claude-role socket at publish time (a Claude Monitor, or any agent listener)
+// is the server's only evidence that an automatic wake path exists. Record it per event as
+// `waiting` — never `claimed`: a socket publish is not model receipt. Without this record the
+// Explorer must assume nobody is listening and shows its manual-recovery fallback even while
+// the agent is handling the event. Best-effort: the event itself is already durable in the
+// feedback journal, so a failed evidence append must not fail the recording.
+let claudeSubscribers = 0;
+
+function recordWaitingDelivery(envelope: RecordedEnvelope): void {
+  try {
+    appendDurable(
+      deliveryFile,
+      {
+        ts: new Date().toISOString(),
+        run_id: envelope.run_id,
+        event_id: envelope.event_id,
+        order: envelope.order,
+        state: "waiting",
+      },
+      journalByteLimit(),
+    );
+  } catch (error) {
+    console.log(
+      `warning: could not record delivery evidence for ${envelope.event_id} (${(error as Error).message})`,
+    );
+  }
+}
+
 function startServer(port: number) {
   return Bun.serve<{ role: "page" | "claude" }>({
     port,
@@ -477,6 +506,7 @@ function startServer(port: number) {
       open(ws) {
         ws.subscribe(ws.data.role);
         if (ws.data.role === "page") ws.send(snapshot());
+        if (ws.data.role === "claude") claudeSubscribers++;
         console.log(`ws open: ${ws.data.role}`);
       },
       message(ws, raw) {
@@ -539,10 +569,14 @@ function startServer(port: number) {
             order: envelope.order,
           }),
         );
-        if (ACTIONABLE.has(envelope.type)) server.publish("claude", line);
+        if (ACTIONABLE.has(envelope.type)) {
+          server.publish("claude", line);
+          if (claudeSubscribers > 0) recordWaitingDelivery(envelope);
+        }
         console.log(`event: ${line}`);
       },
       close(ws) {
+        if (ws.data.role === "claude") claudeSubscribers--;
         console.log(`ws close: ${ws.data.role}`);
       },
     },

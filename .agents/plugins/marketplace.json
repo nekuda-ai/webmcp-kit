@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "webmcp-kit",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement against @nekuda/webmcp-sdk, and verify the tools in a browser.",
       "source": { "source": "local", "path": "./plugin" },
       "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },

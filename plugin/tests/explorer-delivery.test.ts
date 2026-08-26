@@ -127,7 +127,8 @@ test("socket and requests carry the canonical capability/run envelope", async ()
     type: "comment", payload: { suggestion: null, text: "Rename the search tool" },
   });
   expect(await h.page.locator("#convInput").inputValue()).toBe("Rename the search tool");
-  expect(await h.page.locator("#toast").textContent()).toBe("Saving…");
+  expect(await h.page.locator("#statusBox").textContent()).toBe("Saving…");
+  expect(await h.page.locator("#toast").textContent()).toBe("");
 });
 
 test("the post-build card records Connect and renders run-level success with locked copy", async () => {
@@ -260,11 +261,12 @@ test("recorded clears the input, delivery still waits, and handled needs an ack"
   const sent = await h.lastRequest();
   await h.emit({ type: "recorded", request_id: sent.request_id, event_id: "event-a", run_id: "run-a", order: 7 });
   expect(await h.page.locator("#convInput").inputValue()).toBe("");
-  const savedCopy = await h.page.locator("#toast").textContent() ?? "";
-  expect(savedCopy).toContain("original agent task");
-  expect(savedCopy).toContain("different task must reconcile it manually");
+  const savedCopy = await h.page.locator("#statusBox").textContent() ?? "";
+  expect(savedCopy).toContain("terminal session that started this run");
+  expect(savedCopy).toContain("fresh session can pick it up");
   expect(savedCopy).not.toContain("waiting for this run");
   expect(savedCopy).not.toContain("/hooks");
+  expect(await h.page.locator("#toast").textContent()).toBe("");
 
   const feedback = `${JSON.stringify({
     event_id: "event-a", run_id: "run-a", order: 7, type: "comment",
@@ -286,7 +288,7 @@ test("recorded clears the input, delivery still waits, and handled needs an ack"
     "_ack.ndjson": `${JSON.stringify({ ts: "2026-08-18T12:00:01.000Z", run_id: "run-a", event_id: "event-a", status: "handled" })}\n`,
   });
   expect(await h.page.locator("#statusBox").textContent()).toBe("Handled by the agent");
-  expect(await h.page.locator("#toast").textContent()).toBe("Handled by the agent");
+  expect(await h.page.locator("#toast").textContent()).toBe("");
 });
 
 test("submit and approval show Saving until recorded, with no celebration", async () => {
@@ -339,7 +341,7 @@ test("a recorded approval remains disabled and truthful after a real page reload
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Approval saved");
   expect(await h.page.locator("#primaryAction").isDisabled()).toBe(true);
   expect(await h.sentCount()).toBe(0);
-  expect(await h.page.locator("#statusBox").textContent()).toContain("original agent task");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("terminal session that started this run");
 
   await h.snapshot({
     ...files,
@@ -391,7 +393,7 @@ test("a submit appended before disconnect reconciles only from an exact refreshe
     "_feedback.ndjson": `${[...unsafe, recorded].map((event) => JSON.stringify(event)).join("\n")}\n`,
   });
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Plan submitted");
-  expect(await h.page.locator("#statusBox").textContent()).toContain("original agent task");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("terminal session that started this run");
 });
 
 test("a genuinely lost submit becomes explicitly retryable after bounded reconciliation", async () => {
@@ -480,7 +482,7 @@ test("an approval appended before disconnect reconciles on the refreshed journal
   });
   expect(await h.page.locator("#primaryLabel").textContent()).toBe("Approval saved");
   expect(await h.page.locator("#primaryAction").isDisabled()).toBe(true);
-  expect(await h.page.locator("#statusBox").textContent()).toContain("original agent task");
+  expect(await h.page.locator("#statusBox").textContent()).toContain("terminal session that started this run");
 });
 
 test("a run-level timeout applies to later actions until delivery supersedes it", async () => {

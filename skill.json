@@ -1,0 +1,39 @@
+{
+  "name": "webmcp-kit",
+  "description": "Coding-agent plugin that adds WebMCP (document.modelContext) tools to a web app: reads the repo, proposes a reviewable tool plan, waits for approval, implements against @nekuda/webmcp-sdk, and verifies every tool in a real browser. Runs locally — your code never leaves your machine.",
+  "license": "MIT",
+  "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
+  "repository": "https://github.com/nekuda-ai/webmcp-kit",
+  "homepage": "https://docs.nekuda.ai",
+  "keywords": [
+    "webmcp",
+    "document-modelcontext",
+    "ai-agents",
+    "browser-agents",
+    "agent-skill",
+    "agent-tools",
+    "model-context",
+    "mcp",
+    "claude-code",
+    "codex",
+    "web-development"
+  ],
+  "categories": ["web-development", "agent-architecture"],
+  "agents": ["claude-code", "codex"],
+  "skills": [
+    {
+      "id": "implement",
+      "path": "skills/implement/SKILL.md",
+      "description": "Add WebMCP tools to a website: read the repo, propose a tool plan, wait for approval, implement against @nekuda/webmcp-sdk, and verify each tool in a real browser."
+    },
+    {
+      "id": "verify",
+      "path": "skills/verify/SKILL.md",
+      "description": "Check that a locally running site's WebMCP tools register and execute correctly, on the right pages and auth states."
+    }
+  ],
+  "install": {
+    "claude-code": ["/plugin marketplace add nekuda-ai/webmcp-kit", "/plugin install webmcp-kit@nekuda"],
+    "codex": ["codex plugin marketplace add nekuda-ai/webmcp-kit", "codex plugin add webmcp-kit"]
+  }
+}

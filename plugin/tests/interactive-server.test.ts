@@ -936,3 +936,56 @@ test("portable path checks reject final-path symlink swaps before reading or app
     expect(readFileSync(outside, "utf8")).toBe("sentinel");
   }
 }, 15_000);
+
+test("actionable events record waiting delivery evidence only while a claude socket is subscribed", async () => {
+  const workspace = temporaryWorkspace();
+  const { proc, run } = await start(workspace);
+  let serverOutput = "";
+  (async () => {
+    for await (const chunk of proc.stdout) serverOutput += new TextDecoder().decode(chunk);
+  })();
+  const delivery = () => {
+    const path = join(workspace, ".webmcp", "_delivery.ndjson");
+    if (!existsSync(path)) return [];
+    return readFileSync(path, "utf8")
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  };
+  const record = async (inbox: SocketInbox, requestId: string, text: string) => {
+    inbox.socket.send(
+      JSON.stringify({ request_id: requestId, type: "comment", payload: { suggestion: null, text } }),
+    );
+    return inbox.next(
+      (message) => message.type === "recorded" && message.request_id === requestId,
+      `${requestId} recorded`,
+    );
+  };
+  const page = await connect(run, "page");
+
+  const unheard = await record(page, "comment-unheard", "Nobody is listening yet");
+  await Bun.sleep(100);
+  expect(delivery()).toHaveLength(0);
+
+  const claude = await connect(run, "claude");
+  const heard = await record(page, "comment-heard", "The agent is listening");
+  await claude.next((message) => message.type === "comment", "claude relay");
+  const evidence = await waitFor(
+    () => delivery().find((line) => line.event_id === heard.event_id) ?? null,
+    "waiting delivery evidence",
+  );
+  expect(evidence).toEqual({
+    ts: expect.any(String),
+    run_id: run.run_id,
+    event_id: heard.event_id,
+    order: heard.order,
+    state: "waiting",
+  });
+  expect(delivery().some((line) => line.event_id === unheard.event_id)).toBe(false);
+
+  claude.socket.close();
+  await waitFor(() => (serverOutput.includes("ws close: claude") ? true : null), "claude close observed");
+  const afterClose = await record(page, "comment-after-close", "The agent went away");
+  await Bun.sleep(100);
+  expect(delivery().some((line) => line.event_id === afterClose.event_id)).toBe(false);
+});

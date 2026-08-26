@@ -12,7 +12,7 @@
      the page script: no inline handlers, no eval, nothing loadable but pinned driver.js.
      The two script hashes and the style hash cover this file's inline blocks —
      regenerate them if you edit any inline style or script block. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-H2PZefWdV9cbGszOn24X2sV28/4/Rm2qhm0lOc4x+o8=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-tnj2s0oGvef1ePwh/wYEgQtOcqXzLdXod3iB2D+2+Qo=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-H2PZefWdV9cbGszOn24X2sV28/4/Rm2qhm0lOc4x+o8=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-oA7Q/p0pkPC0dBhyyNpIbgmodhWPqTxM6q+yFgT/+Oo=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css" integrity="sha384-XUGWln86d3kDvw/W1Qbii8QQyeWs2LcFYfGhYrmSZ0ZiXxowttKpfdhPdLE+WMFx" crossorigin="anonymous">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("webmcp-explorer-theme")||"light"}catch(e){}</script>
 <style>:root{--bg:#f6f7f6;--panel:#fff;--ink:#222624;--muted:#737975;--line:#dfe3e0;--blue:#279cff;--blue-bg:#eef8ff;--green:#41865f;--green-bg:#eef6f1;--gold:#987627;--gold-bg:#fbf6e8;--red:#b55545;--red-bg:#fff1ee;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
@@ -924,8 +924,7 @@ function confirmRequest(r,event){
   clearTimeout(r.reconcileTimer);r.reconcileTimer=null;
   r.state="recorded";r.eventId=safeStr(event.event_id);r.order=Number(event.order);
   var done=r.onRecorded;r.onRecorded=null;r.onError=null;if(done)done(r);
-  if(r.type==="pick"){requests.delete(r.requestId);toast("Saved")}
-  else toast(durableWaitCopy(model?deliveryState({event_id:r.eventId,order:r.order}):""));
+  if(r.type==="pick")requests.delete(r.requestId);
   if(model)render();
 }
 function recordedRequest(msg){
@@ -968,7 +967,7 @@ function send(type,payload,onRecorded,onError){
   });
   var requestId=newRequestId(),r={requestId:requestId,type:type,payload:payload,payloadKey:canonicalJson(payload),state:"saving",created:requestSeq,
     createdAt:Date.now(),afterOrder:model?model.lastOrder:-1,onRecorded:onRecorded,onError:onError};
-  requests.set(requestId,r);toast("Saving…");if(model)renderReview();
+  requests.set(requestId,r);if(model)renderReview();
   try{socket.send(JSON.stringify({request_id:requestId,type:type,payload:payload}));return requestId}
   catch(e){requests.delete(requestId);if(onError)onError();toast("Couldn’t save that action — try again");return false}
 }
@@ -1710,7 +1709,7 @@ function durableWaitCopy(state){
   if(state==="timeout")return "Saved safely. This run’s agent task hasn’t handled it yet — resume or message that original task. If /hooks there lists this plugin, review its hook trust.";
   if(state==="conflict"||state==="error")return "Saved safely, but automatic delivery needs attention. Resume or message this run’s original agent task. If /hooks there lists this plugin, review its hook trust.";
   if(state==="waiting"||state==="claimed")return "Saved — waiting for this run’s agent task";
-  return "Saved safely — resume or message this run’s original agent task. A different task must reconcile it manually.";
+  return "Saved — but the agent isn’t watching right now. Nudge the terminal session that started this run to continue; a fresh session can pick it up from the saved state.";
 }
 function matchingRecordedEvent(r){
   if(!RUN_ID||snapshotSeq<=r.reconcileAfter||(r.type!=="submit"&&r.type!=="approve"&&r.type!=="connect"))return null;
@@ -1734,7 +1733,7 @@ function beginReconciliation(r){
     if(queued||pending!==null){r.reconcileTimer=setTimeout(settle,20);return}
     r.state="retryable";r.reconcileTimer=null;
     var failed=r.onError;r.onError=null;if(failed)failed();
-    toast("The action was not recorded — retry is safe");if(model)render();
+    if(model)render();
   };
   r.reconcileTimer=setTimeout(settle,RECONCILE_GRACE_MS);
 }
@@ -1745,7 +1744,7 @@ function syncRequests(){
       if(match)confirmRequest(r,match);else beginReconciliation(r);
     }
     if(!r.eventId||!model.handled.has(r.eventId)||r.state==="handled")return;
-    r.state="handled";toast("Handled by the agent");
+    r.state="handled";
     setTimeout(function(){if(requests.get(id)===r){requests.delete(id);if(model)renderReview()}},2200);
   });
 }
