@@ -6,6 +6,8 @@ It reads your repo, proposes a tool plan, **waits for your approval**, implement
 
 Works with **Claude Code** and **Codex**.
 
+📖 Full documentation: **[docs.nekuda.ai](https://docs.nekuda.ai)**
+
 ## Install
 
 **Claude Code**
@@ -24,18 +26,6 @@ codex plugin add webmcp-kit
 
 Or run `/plugins` inside Codex and install it from the browser there.
 
-On Codex, installing also registers the plugin's lifecycle hooks (`PreToolUse`/`Stop`) — they only ferry feedback from the live review UI back to the agent, and you can inspect them anytime with `/hooks`.
-
-## Package for the OpenAI Platform
-
-Build the skills-only ZIP accepted by the OpenAI Platform plugin uploader:
-
-```sh
-python3 scripts/package-openai-skills.py
-```
-
-The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest, brand assets, and both skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
-
 ## Prerequisites
 
 - [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex)
@@ -52,7 +42,30 @@ Open your repo in your agent and ask it to make your website or web app agent-re
 3. **Implement** — typed tools wired to your app's own client logic.
 4. **Verify** — each tool is checked in a real browser and reported as **verified**, **failed**, or **could-not-verify**. Failed never ships.
 
-Already have WebMCP tools? The `verify` skill (`/webmcp-kit:verify`) checks they register and work.
+Already have WebMCP tools? The `verify` skill (`/webmcp-kit:verify` in Claude Code) checks they register and work.
+
+## Reviewing the plan
+
+Instead of reading a plan in chat, the plugin can open a local review page: your
+proposed tools laid out by page, each with the reasoning behind it. Comment on
+individual tools, pick which ones to build, and approve when you are happy.
+Nothing is written until you do.
+
+This works the same on both hosts. Each one has its own way for the browser to
+hand your decision back to the agent — on Codex that is the plugin's bundled
+`PreToolUse`/`Stop` lifecycle hooks, registered when you install and inspectable
+anytime with `/hooks`; they only carry your review actions back to the agent.
+Prefer chat? Review there instead and skip the browser entirely.
+
+## Package for the OpenAI Platform
+
+Build the skills-only ZIP accepted by the OpenAI Platform plugin uploader:
+
+```sh
+python3 scripts/package-openai-skills.py
+```
+
+The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest, brand assets, and both skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
 
 ## License
 
