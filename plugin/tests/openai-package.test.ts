@@ -72,4 +72,26 @@ test("the OpenAI skills bundle carries every runtime path its instructions invok
     "scripts/webmcp.sh",
   ]);
   for (const reference of references) expect(names).toContain(`webmcp-kit/${reference}`);
+
+  // The bundle copies skills/ wholesale, so a skill's references ride along for free —
+  // right up until one is named in a SKILL.md and never written, or written outside the
+  // skill directory the copy walks. Both package cleanly and only fail once an installed
+  // agent tries to load the file. Resolve every mention against the archive itself.
+  const skillEntries = [...names].filter((name) =>
+    /^webmcp-kit\/skills\/[^/]+\/SKILL\.md$/.test(name),
+  );
+  expect(skillEntries.length).toBeGreaterThan(1);
+  let resolved = 0;
+  for (const entry of skillEntries) {
+    const directory = entry.slice(0, entry.lastIndexOf("/"));
+    const mentioned = new Set(archive.texts[entry]!.match(/references\/[\w-]+\.md/g) ?? []);
+    for (const reference of mentioned) {
+      expect(names).toContain(`${directory}/${reference}`);
+      resolved += 1;
+    }
+  }
+  // A skill may legitimately have no references (`verify` has none), but a run that
+  // resolved nothing means the mention pattern stopped matching and the loop above
+  // became a no-op that passes on any tree.
+  expect(resolved).toBeGreaterThan(0);
 });

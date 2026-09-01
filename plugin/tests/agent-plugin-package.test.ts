@@ -157,6 +157,121 @@ test("skill CLI calls resolve through the installed plugin entry", () => {
   }
 });
 
+// skill.json is the hand-maintained discovery list copied to the public repo root on
+// release; nothing else enumerates the skills, because both host manifests discover
+// plugin/skills/ by directory. So a skill added to the tree is listed everywhere the
+// hosts look and nowhere the indexers look — it installs and runs, and the release is
+// silent about it. This is the check that makes the two agree.
+test("every skill in the tree is listed in the discovery manifest", () => {
+  const skillsDir = join(pluginRoot, "skills");
+  const listed = JSON.parse(readFileSync(join(pluginRoot, "skill.json"), "utf8")) as {
+    skills: { id: string; path: string; description: string }[];
+  };
+  const onDisk = readdirSync(skillsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(join(skillsDir, entry.name, "SKILL.md")))
+    .map((entry) => entry.name)
+    .sort();
+
+  expect(onDisk.length).toBeGreaterThan(0);
+  expect(listed.skills.map((skill) => skill.id).sort()).toEqual(onDisk);
+  for (const skill of listed.skills) {
+    expect(skill.path).toBe(`skills/${skill.id}/SKILL.md`);
+    expect(existsSync(join(pluginRoot, skill.path))).toBe(true);
+    expect(skill.description.length).toBeGreaterThan(0);
+  }
+});
+
+// plugin/AGENTS.md is released bytes: sync-to-public copies it to the public repo ROOT,
+// where GitHub and the skill indexers read it as the plugin's front door. It enumerates
+// the skills in prose, and prose does not fail to compile — the "Two skills:" line
+// survived a third skill landing in the tree, so the one file an indexer reads first was
+// the one describing a plugin that no longer existed. Same equality as the manifest check
+// above, against the sentence a human reads.
+test("the released agent-facing doc names every skill in the tree", () => {
+  const doc = readFileSync(join(pluginRoot, "AGENTS.md"), "utf8");
+  const skillsDir = join(pluginRoot, "skills");
+  const onDisk = readdirSync(skillsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(join(skillsDir, entry.name, "SKILL.md")))
+    .map((entry) => entry.name);
+
+  expect(onDisk.length).toBeGreaterThan(0);
+  for (const id of onDisk) {
+    expect(doc).toContain(`\`${id}\``);
+  }
+  // The count word is part of the claim: naming all three under "Two skills" reads as a
+  // list with one skill bolted on rather than as the plugin's actual surface. Read the
+  // word the doc actually uses rather than asserting one built from a lookup table — past
+  // the table's end that assertion demands the literal "undefined skills:", failing with
+  // a message that names nothing on the exact event it was written for: a skill landing.
+  const counts = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
+  const stated = doc.match(/\*\*(\w+) skills:\*\*/)?.[1];
+  expect({ word: stated, skills: onDisk.length }).toEqual({
+    word: counts[onDisk.length] ?? String(onDisk.length),
+    skills: onDisk.length,
+  });
+});
+
+// The derivation in stable-keys.md is a rule plus a table of worked examples, and the
+// table is what a reader copies. An example that does not survive the rule it illustrates
+// — or that the SDK's own `stableKey` pattern would reject — teaches a key the SDK throws
+// on at module load. Re-derive every documented row from the documented algorithm.
+test("every worked stableKey example follows the derivation and the SDK pattern", () => {
+  const stableKeys = readFileSync(
+    join(pluginRoot, "skills", "connect-existing-tools", "references", "stable-keys.md"),
+    "utf8",
+  );
+  const sdkPattern = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
+  const derive = (wireName: string) =>
+    `adopted.${wireName.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "")}`;
+
+  const rows = [...stableKeys.matchAll(/^\| `([^`]+)` \| `(adopted\.[^`]+)` \|$/gm)].map(
+    (row) => ({ wireName: row[1]!, documented: row[2]! }),
+  );
+
+  expect(rows.length).toBeGreaterThanOrEqual(5);
+  for (const { wireName, documented } of rows) {
+    expect({ wireName, key: documented }).toEqual({ wireName, key: derive(wireName) });
+    expect(documented).toMatch(sdkPattern);
+  }
+});
+
+// Four decisions this skill exists to carry, each losable by an edit that still reads
+// well. They are pinned where they are stated, not where they are summarized.
+test.each([
+  [
+    "detection.md",
+    // Detection labels; it never licenses a rewrite. The recognizer list is deliberately
+    // generous only because that separation holds.
+    ["never authorizes a rewrite", "**list** tools, never execute them", "runtime-unverified"],
+  ],
+  [
+    "inventory.md",
+    // A baseline re-derived from the migrated tree checks the tree against itself.
+    ["never re-derived", "registered: false", "verbatim"],
+  ],
+  [
+    "migration.md",
+    // The SDK defaults `name` to `stableKey`, so an omitted `name` renames every tool.
+    ["EXPLICIT", "One batch per registration scope", "never guess"],
+  ],
+  [
+    "stable-keys.md",
+    ["cannot be guaranteed in all cases", "Never re-derive", "immutable"],
+  ],
+  [
+    "verify-connection.md",
+    // Configuration and readiness are checks on this machine; only the runtime part
+    // observes what a visitor's browser does.
+    ['not "a request was sent"', "no rejection message", "at most once per page load"],
+  ],
+])("%s keeps the decision it carries", (file, phrases) => {
+  const body = readFileSync(
+    join(pluginRoot, "skills", "connect-existing-tools", "references", file),
+    "utf8",
+  );
+  for (const phrase of phrases) expect(body).toContain(phrase);
+});
+
 test("Connect reconciles the key and environment endpoint across every entry batch", () => {
   const connect = readFileSync(
     join(pluginRoot, "skills", "implement", "references", "connect.md"),

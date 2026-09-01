@@ -619,7 +619,9 @@ function writeAtomic(path: string, text: string): void {
 }
 
 function ensureRuntimeIgnored(): void {
-  const required = [".port*", ".run.json*", ".server.lock*", ".ack.lock*"];
+  // `connect.lock` is runtime state like the rest: it names a pid, and a committed one
+  // wedges `webmcp connect` with `connect_in_progress` in every clone of the repo.
+  const required = [".port*", ".run.json*", ".server.lock*", ".ack.lock*", "connect.lock*"];
   let existing = readRegularText(gitignoreFile, 64 * 1024) ?? "";
   const lines = new Set(existing.split("\n"));
   const missing = required.filter((line) => !lines.has(line));

@@ -1,7 +1,7 @@
 {
   "name": "webmcp-kit",
-  "version": "0.6.0",
-  "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement the tools, and verify them in a browser.",
+  "version": "0.7.0",
+  "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement the tools, and verify them in a browser — or connect the tools a site already has, without rebuilding them.",
   "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
   "homepage": "https://github.com/nekuda-ai/webmcp-kit",
   "repository": "https://github.com/nekuda-ai/webmcp-kit",
@@ -12,16 +12,17 @@
   "interface": {
     "displayName": "WebMCP Kit",
     "shortDescription": "Make web apps agent-ready",
-    "longDescription": "Add WebMCP tools to a website or web app through a guided workflow that analyzes the codebase, proposes a tool plan for approval, implements the tools with @nekuda/webmcp-sdk, and verifies them in a real browser.",
+    "longDescription": "Add WebMCP tools to a website or web app through a guided workflow that analyzes the codebase, proposes a tool plan for approval, implements the tools with @nekuda/webmcp-sdk, and verifies them in a real browser. When a site already has working tools, it moves their registration onto the SDK instead — same names, same schemas, same handlers — and proves each one still behaves as it did.",
     "developerName": "nekuda",
     "category": "Developer Tools",
-    "capabilities": ["Add WebMCP tools", "Verify WebMCP tools"],
+    "capabilities": ["Add WebMCP tools", "Verify WebMCP tools", "Connect existing WebMCP tools"],
     "websiteURL": "https://github.com/nekuda-ai/webmcp-kit",
     "composerIcon": "./assets/nekuda-logo.png",
     "logo": "./assets/nekuda-logo.png",
     "defaultPrompt": [
       "Make this web app agent-ready with WebMCP tools.",
-      "Verify this site's WebMCP tools in a browser."
+      "Verify this site's WebMCP tools in a browser.",
+      "Connect this site's existing WebMCP tools without rebuilding them."
     ]
   }
 }

@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -39,8 +40,12 @@ const protocolEntry = join(interactive, "protocol.ts");
 const workspaces = new Set<string>();
 const processes = new Set<ReturnType<typeof Bun.spawn>>();
 
+// Resolved, because the server resolves the workspace it is given before recording
+// it in .run.json and the tests compare the two. On Linux this is the identity; on
+// macOS `tmpdir()` is the symlink /var -> /private/var, so an unresolved path here
+// fails every such comparison for a reason that has nothing to do with the server.
 function temporaryWorkspace(): string {
-  const workspace = mkdtempSync(join(tmpdir(), "webmcp-interactive-server-"));
+  const workspace = realpathSync(mkdtempSync(join(tmpdir(), "webmcp-interactive-server-")));
   workspaces.add(workspace);
   return workspace;
 }

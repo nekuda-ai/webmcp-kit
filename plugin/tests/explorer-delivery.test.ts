@@ -84,7 +84,18 @@ async function harness(): Promise<Harness> {
     emit,
     snapshot: async (files) => {
       await emit({ type: "snapshot", files });
-      await page.waitForTimeout(30);
+      // The page coalesces file bursts behind `setTimeout(…, 16)` (`queueFiles`) and
+      // renders synchronously when that timer fires. Waiting a wall-clock 30ms was a
+      // race a loaded machine loses: the assertions then read the PREVIOUS render and
+      // report a copy mismatch that is indistinguishable from a real regression.
+      //
+      // This waits on ORDER instead of duration. The page's timer was scheduled while
+      // the message was delivered, i.e. strictly before this one, and both ask for the
+      // same delay — so the page's task is queued first and has already run (render
+      // included) by the time this resolves, however far behind the event loop is.
+      // The page's own state is not reachable from here: `addScriptTag` does not put
+      // the script's top-level `var`s on `window`.
+      await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 16)));
     },
     lastRequest: () => page.evaluate(() => {
       const sent = (globalThis as any).__explorerSocket.sent;

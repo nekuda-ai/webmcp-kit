@@ -1,6 +1,6 @@
 {
   "name": "webmcp-kit",
-  "description": "Coding-agent plugin that adds WebMCP (document.modelContext) tools to a web app: reads the repo, proposes a reviewable tool plan, waits for approval, implements against @nekuda/webmcp-sdk, and verifies every tool in a real browser. Runs locally — your code never leaves your machine.",
+  "description": "Coding-agent plugin that adds WebMCP (document.modelContext) tools to a web app: reads the repo, proposes a reviewable tool plan, waits for approval, implements against @nekuda/webmcp-sdk, and verifies every tool in a real browser. When a site already has working tools, it connects those instead — moving their registration onto the SDK without rebuilding them. Runs locally — your code never leaves your machine.",
   "license": "MIT",
   "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
   "repository": "https://github.com/nekuda-ai/webmcp-kit",
@@ -30,6 +30,11 @@
       "id": "verify",
       "path": "skills/verify/SKILL.md",
       "description": "Check that a locally running site's WebMCP tools register and execute correctly, on the right pages and auth states."
+    },
+    {
+      "id": "connect-existing-tools",
+      "path": "skills/connect-existing-tools/SKILL.md",
+      "description": "Connect a site's existing WebMCP tools to AgentLane without rebuilding them: detect the current registrations, inventory them, migrate the registration layer to @nekuda/webmcp-sdk with durable stable keys, and verify behavior is unchanged."
     }
   ],
   "install": {
