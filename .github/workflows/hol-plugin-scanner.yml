@@ -20,6 +20,7 @@ jobs:
         with:
           plugin_dir: "."
           mode: scan
+          config: ".plugin-scanner.toml"
           min_score: 80
           fail_on_severity: high
           format: sarif
