@@ -4,7 +4,7 @@ Make your website or web app agent-ready. WebMCP Kit is a coding-agent plugin th
 
 It reads your repo, proposes a tool plan, **waits for your approval**, implements the tools with [`@nekuda/webmcp-sdk`](https://www.npmjs.com/package/@nekuda/webmcp-sdk), and verifies them in a real browser. Everything runs locally — **your code never leaves your machine**; there is no hosted scanner.
 
-Works with **Claude Code** and **Codex**.
+Works with **Claude Code**, **Codex**, and **Cursor**.
 
 ## Install
 
@@ -26,6 +26,14 @@ Or run `/plugins` inside Codex and install it from the browser there.
 
 On Codex, installing also registers the plugin's lifecycle hooks (`PreToolUse`/`Stop`) — they only ferry feedback from the live review UI back to the agent, and you can inspect them anytime with `/hooks`.
 
+**Cursor**
+
+```sh
+npx skills add nekuda-ai/webmcp-kit --skill '*' --agent cursor
+```
+
+This installs all three Agent Skills for Cursor: `implement`, `verify`, and `connect-existing-tools`.
+
 ## Package for the OpenAI Platform
 
 Build the skills-only ZIP accepted by the OpenAI Platform plugin uploader:
@@ -34,18 +42,18 @@ Build the skills-only ZIP accepted by the OpenAI Platform plugin uploader:
 python3 scripts/package-openai-skills.py
 ```
 
-The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest, brand assets, and both skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
+The archive is written to `dist/webmcp-kit-<version>.zip`. It includes the Codex manifest, brand assets, and all three skills, and leaves out repository files and the lifecycle hooks used by the full marketplace install.
 
 ## Prerequisites
 
-- [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex)
+- [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex), or [Cursor](https://cursor.com/)
 - A website or web app you can run locally — any stack, the plugin adapts
 - [Bun](https://bun.sh) *(optional)* — powers the live review UI; without it you review the plan in chat
 - Chrome 150+ with the WebMCP flag enabled (`chrome://flags`) — used to verify tools in a real browser
 
 ## Use
 
-Open your repo in your agent and ask it to make your website or web app agent-ready (in Claude Code: `/webmcp-kit:implement`). Then:
+Open your repo in your agent and ask it to make your website or web app agent-ready (Claude Code: `/webmcp-kit:implement`; Cursor: `/implement`). Then:
 
 1. **Plan** — it maps your routes, forms, and data layer, and proposes a small set of tools.
 2. **Approve** — nothing is written until you say yes.
