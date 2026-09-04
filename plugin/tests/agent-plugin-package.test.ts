@@ -100,6 +100,41 @@ function markdownFiles(directory: string): string[] {
   });
 }
 
+function relativeFiles(directory: string, base = directory): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return relativeFiles(path, base);
+    return [path.slice(base.length + 1)];
+  });
+}
+
+test("the portable Agent Plugins package mirrors the released skills and runtime", () => {
+  const portableRoot = join(pluginRoot, "..");
+  const manifest = JSON.parse(readFileSync(join(portableRoot, "plugin.json"), "utf8"));
+  const codex = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
+
+  expect(manifest.$schema).toBe(
+    "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  );
+  expect(manifest.name).toBe(codex.name);
+  expect(manifest.version).toBe(codex.version);
+
+  for (const directory of ["skills", "cli"]) {
+    const source = join(pluginRoot, directory);
+    const portable = join(portableRoot, directory);
+    expect(relativeFiles(portable).sort()).toEqual(relativeFiles(source).sort());
+    for (const file of relativeFiles(source)) {
+      expect(readFileSync(join(portable, file))).toEqual(readFileSync(join(source, file)));
+    }
+  }
+  for (const file of ["webmcp.sh", "webmcp.cmd"]) {
+    expect(readFileSync(join(portableRoot, "scripts", file))).toEqual(
+      readFileSync(join(pluginRoot, "scripts", file)),
+    );
+  }
+  expect(existsSync(join(portableRoot, "assets", "icon.png"))).toBe(true);
+});
+
 test("skill CLI calls resolve through the installed plugin entry", () => {
   const skills = join(pluginRoot, "skills");
   const connect = readFileSync(join(skills, "implement", "references", "connect.md"), "utf8");

@@ -1,0 +1,40 @@
+{
+  "name": "webmcp-kit",
+  "version": "0.7.0",
+  "description": "Add WebMCP tools to a web app: map user journeys in a visual Explorer, implement approved tools through the app's own logic, and verify them in a real browser.",
+  "author": {
+    "name": "nekuda",
+    "url": "https://github.com/nekuda-ai"
+  },
+  "homepage": "https://docs.nekuda.ai",
+  "repository": "https://github.com/nekuda-ai/webmcp-kit",
+  "license": "MIT",
+  "keywords": [
+    "webmcp",
+    "model-context",
+    "browser-agents",
+    "agent-tools",
+    "web-development"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "WebMCP Kit",
+    "shortDescription": "Make web apps agent-ready",
+    "longDescription": "Map a web app's user journeys in a visual Explorer, propose WebMCP tools for approval, implement them through the app's own logic, and verify each tool in a real browser.",
+    "developerName": "nekuda",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Add WebMCP tools",
+      "Verify WebMCP tools",
+      "Connect existing WebMCP tools"
+    ],
+    "websiteURL": "https://docs.nekuda.ai",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png",
+    "defaultPrompt": [
+      "Make this web app agent-ready with WebMCP tools.",
+      "Verify this site's WebMCP tools in a browser.",
+      "Connect this site's existing WebMCP tools without rebuilding them."
+    ]
+  }
+}
