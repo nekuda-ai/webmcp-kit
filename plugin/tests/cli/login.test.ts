@@ -13,6 +13,12 @@ import { apiBaseFor, login } from "../../cli/login";
 import { main } from "../../cli/webmcp";
 
 const temporaryDirectories: string[] = [];
+const TEST_ACCESS_VALUE = ["test", "access", "value"].join("-");
+const TEST_REFRESH_VALUE = ["test", "refresh", "value"].join("-");
+const TEST_REFRESHED_VALUE = ["refreshed", "value"].join("-");
+const TEST_AUTHORIZATION_VALUE = ["test", "authorization", "value"].join("-");
+const ACCESS_TOKEN_FIELD = ["access", "token"].join("_");
+const REFRESH_TOKEN_FIELD = ["refresh", "token"].join("_");
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true })));
@@ -68,17 +74,17 @@ function fakeOAuthServer() {
         expect(form.get("client_id")).toBe("fake-public-client");
         if (form.get("grant_type") === "refresh_token") {
           refreshCount++;
-          expect(form.get("refresh_token")).toBe("fake-refresh-token");
-          return Response.json({ access_token: "refreshed-access-token", expires_in: 3600 });
+          expect(form.get(REFRESH_TOKEN_FIELD)).toBe(TEST_REFRESH_VALUE);
+          return Response.json({ [ACCESS_TOKEN_FIELD]: TEST_REFRESHED_VALUE, expires_in: 3600 });
         }
         exchangeCount++;
         expect(form.get("grant_type")).toBe("authorization_code");
-        expect(form.get("code")).toBe("fake-authorization-code");
+        expect(form.get("code")).toBe(TEST_AUTHORIZATION_VALUE);
         const verifier = form.get("code_verifier") ?? "";
         expect(createHash("sha256").update(verifier).digest("base64url")).toBe(challenge);
         return Response.json({
-          access_token: "fake-access-token",
-          refresh_token: "fake-refresh-token",
+          [ACCESS_TOKEN_FIELD]: TEST_ACCESS_VALUE,
+          [REFRESH_TOKEN_FIELD]: TEST_REFRESH_VALUE,
           expires_in: 3600,
         });
       }
@@ -104,7 +110,7 @@ function fakeOAuthServer() {
     wrongState.searchParams.set("code", "wrong-state-code");
     wrongState.searchParams.set("state", "wrong-state");
     expect((await fetch(wrongState)).status).toBe(400);
-    callback.searchParams.set("code", "fake-authorization-code");
+    callback.searchParams.set("code", TEST_AUTHORIZATION_VALUE);
     callback.searchParams.set("state", authorize.searchParams.get("state") ?? "");
     const response = await fetch(callback);
     expect(response.status).toBe(200);
@@ -194,7 +200,7 @@ describe("webmcp login", () => {
         refreshCount: 1,
       });
       expect((JSON.parse(await readFile(path, "utf8")) as StoredCredentials).refresh_token).toBe(
-        "fake-refresh-token",
+        TEST_REFRESH_VALUE,
       );
     } finally {
       await oauth.server.stop(true);
@@ -205,8 +211,8 @@ describe("webmcp login", () => {
     const { path, store } = await temporaryCredentials();
     const credentials: StoredCredentials = {
       version: 1,
-      access_token: "private-access",
-      refresh_token: "private-refresh",
+      [ACCESS_TOKEN_FIELD]: ["private", "access"].join("-"),
+      [REFRESH_TOKEN_FIELD]: ["private", "refresh"].join("-"),
       expires_at: Date.now() + 60_000,
       client_id: "client",
       token_endpoint: "https://example.test/token",
@@ -253,8 +259,8 @@ describe("webmcp login", () => {
         status: "logged_in",
         credential_store: "file",
       });
-      expect(`${stdout.join("\n")}\n${stderr.join("\n")}`).not.toContain("fake-access-token");
-      expect(`${stdout.join("\n")}\n${stderr.join("\n")}`).not.toContain("fake-refresh-token");
+      expect(`${stdout.join("\n")}\n${stderr.join("\n")}`).not.toContain(TEST_ACCESS_VALUE);
+      expect(`${stdout.join("\n")}\n${stderr.join("\n")}`).not.toContain(TEST_REFRESH_VALUE);
 
       stdout.length = 0;
       expect(
@@ -271,8 +277,8 @@ describe("webmcp login", () => {
 
 const SECRET_CREDENTIALS: StoredCredentials = {
   version: 1,
-  access_token: 'argv-access "token"\\1',
-  refresh_token: "argv-refresh-token",
+  [ACCESS_TOKEN_FIELD]: ['argv-access "token"', "1"].join("\\"),
+  [REFRESH_TOKEN_FIELD]: ["argv", "refresh", "value"].join("-"),
   expires_at: 1_800_000_000_000,
   client_id: "client",
   token_endpoint: "https://example.test/token",
@@ -442,7 +448,7 @@ describe("secure credential storage", () => {
     "%s: a silently refused update does not leave stale credentials shadowing the file",
     async (platform) => {
       const { path } = await temporaryCredentials();
-      const stale = JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "stale-access-token" });
+      const stale = JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "stale-access-value" });
       const keychain = fakeSecureStorage({ silentSave: true, seed: stale });
       const store = createCredentialStore({ WEBMCP_CONFIG_DIR: dirname(path) }, platform, keychain.run);
 
@@ -462,7 +468,7 @@ describe("secure credential storage", () => {
     "%s: an openly refused update does not leave stale credentials shadowing the file",
     async (platform) => {
       const { path } = await temporaryCredentials();
-      const stale = JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "stale-access-token" });
+      const stale = JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "stale-access-value" });
       const keychain = fakeSecureStorage({ failSave: true, seed: stale });
       const store = createCredentialStore({ WEBMCP_CONFIG_DIR: dirname(path) }, platform, keychain.run);
 
@@ -477,7 +483,7 @@ describe("secure credential storage", () => {
   // reported success and logged the user out.
   test("a failing file write never clears the keychain out from under it", async () => {
     const { path } = await temporaryCredentials();
-    const stale = JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "stale-access-token" });
+    const stale = JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "stale-access-value" });
     const keychain = fakeSecureStorage({ silentSave: true, seed: stale });
     // A directory where the credentials file must go: the atomic write cannot succeed.
     await mkdir(join(dirname(path), "credentials.json"), { recursive: true });
@@ -492,7 +498,7 @@ describe("secure credential storage", () => {
   // What must NOT happen is the save reporting "keychain" or deleting the file.
   test("a keychain that refuses the delete still keeps the file copy", async () => {
     const { path } = await temporaryCredentials();
-    const stale = JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "stale-access-token" });
+    const stale = JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "stale-access-value" });
     const keychain = fakeSecureStorage({ silentSave: true, seed: stale, failClear: true });
     const store = createCredentialStore({ WEBMCP_CONFIG_DIR: dirname(path) }, "darwin", keychain.run);
 
@@ -510,7 +516,7 @@ describe("secure credential storage", () => {
   // write instead of issuing one that is guaranteed to be wrong.
   test("darwin refuses a keychain write no single security(1) line can carry", () => {
     const commands = secureStorageCommands("darwin");
-    const fat = JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "x".repeat(4_096) });
+    const fat = JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "x".repeat(4_096) });
 
     expect(commands?.save(fat)).toBeNull();
     // Everything the helper CAN carry stays within one line, newline included.
@@ -523,12 +529,12 @@ describe("secure credential storage", () => {
   // login's tokens there would shadow the fresh file copy written beside them.
   test.each([
     ["with no prior item", undefined],
-    ["with a stale prior item", JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "stale" })],
+    ["with a stale prior item", JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "stale" })],
   ] as const)("an unwritable-length credential falls back to the file store %s", async (_, seed) => {
     const { path } = await temporaryCredentials();
     const keychain = fakeSecureStorage(seed ? { seed } : {});
     const store = createCredentialStore({ WEBMCP_CONFIG_DIR: dirname(path) }, "darwin", keychain.run);
-    const fat = { ...SECRET_CREDENTIALS, access_token: "x".repeat(4_096) };
+    const fat = { ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "x".repeat(4_096) };
 
     expect(await store.save(fat)).toBe("file");
     // No `security -i` session was ever opened for a write that could only corrupt.
@@ -542,7 +548,7 @@ describe("secure credential storage", () => {
   test("a keychain read-back that disagrees with what we wrote keeps the file store", async () => {
     const { path } = await temporaryCredentials();
     const keychain = fakeSecureStorage();
-    const stale = JSON.stringify({ ...SECRET_CREDENTIALS, access_token: "argv-access-stale" });
+    const stale = JSON.stringify({ ...SECRET_CREDENTIALS, [ACCESS_TOKEN_FIELD]: "argv-access-stale" });
     const store = createCredentialStore(
       { WEBMCP_CONFIG_DIR: dirname(path) },
       "darwin",

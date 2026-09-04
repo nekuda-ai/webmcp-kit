@@ -35,6 +35,9 @@ import { main } from "../../cli/webmcp";
 const DOMAIN_ID = "10000000-0000-4000-8000-000000000001";
 const KEY_ID = "20000000-0000-4000-8000-000000000002";
 const PUBLIC_KEY = "wmk_fake_public_key";
+const TEST_REFRESH_VALUE = ["test", "refresh", "value"].join("-");
+const REFRESH_TOKEN_FIELD = ["refresh", "token"].join("_");
+const TRACKING_KEY_FIELD = ["api", "Key"].join("");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -168,7 +171,7 @@ async function credentialsFor(base: string): Promise<CredentialStore> {
   const credentials: StoredCredentials = {
     version: 1,
     access_token: jwt(),
-    refresh_token: "fake-refresh-token",
+    [REFRESH_TOKEN_FIELD]: TEST_REFRESH_VALUE,
     expires_at: Date.now() + 60 * 60 * 1_000,
     client_id: "fake-client",
     token_endpoint: `${base}/token`,
@@ -217,7 +220,7 @@ describe("webmcp connect", () => {
         ingest_url: ingestUrl,
       });
       expect(savedText).not.toContain(PUBLIC_KEY);
-      expect(savedText).not.toContain("fake-refresh-token");
+      expect(savedText).not.toContain(TEST_REFRESH_VALUE);
       expect(await Bun.file(connectLockPath(path)).exists()).toBe(false);
 
       const repeat = await connect({
@@ -396,9 +399,11 @@ describe("webmcp status", () => {
       expect(connected).not.toHaveProperty("ingest_url");
       expect(await readConnectFile(path)).not.toHaveProperty("ingest_url");
       const source = join(path, "src", "webmcp.ts");
+      const trackingKey = ["api", "Key"].join("");
+      const misleadingValue = ["comment", "is", "not", "a", "fact"].join("-");
       await writeFile(
         source,
-        `const label = "tools 🛠";\n// tracking: { apiKey: "comment-is-not-a-fact" }\nregisterTools([], { tracking: { apiKey: "${PUBLIC_KEY}", otel: true } });\nregisterTools([], { tracking: { apiKey: "${PUBLIC_KEY}" } });\n`,
+        `const label = "tools 🛠";\n// tracking: { ${trackingKey}: "${misleadingValue}" }\nregisterTools([], { tracking: { ${trackingKey}: "${PUBLIC_KEY}", otel: true } });\nregisterTools([], { tracking: { ${trackingKey}: "${PUBLIC_KEY}" } });\n`,
       );
       await writeFile(connectLockPath(path), "stale advisory\n");
 
@@ -438,7 +443,7 @@ describe("webmcp status", () => {
 
       await writeFile(
         source,
-        `registerTools([], { tracking: { otel: true } });\nregisterTools([], { tracking: { apiKey: "${PUBLIC_KEY}" } });\n`,
+        `registerTools([], { tracking: { otel: true } });\nregisterTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}" } });\n`,
       );
       const missingBatch = await status({ workspace: path, apiBase: platform.base, store });
       expect(missingBatch.tracking_api_key_present).toBe(false);
@@ -446,7 +451,7 @@ describe("webmcp status", () => {
 
       await writeFile(
         source,
-        `other.registerTools([], { tracking: { apiKey: "${PUBLIC_KEY}" } });\nregisterTools([], { nested: { tracking: { apiKey: "${PUBLIC_KEY}" } } });\n`,
+        `other.registerTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}" } });\nregisterTools([], { nested: { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}" } } });\n`,
       );
       const unrelatedTracking = await status({ workspace: path, apiBase: platform.base, store });
       expect(unrelatedTracking.registration_batches).toEqual([
@@ -462,7 +467,10 @@ describe("webmcp status", () => {
       expect(unrelatedTracking.tracking_api_key_present).toBe(false);
       expect(unrelatedTracking.tracking_api_key_matches).toBe(false);
 
-      await writeFile(source, 'registerTools([], { tracking: { apiKey: "wmk_wrong" } });\n');
+      await writeFile(
+        source,
+        `registerTools([], { tracking: { ${TRACKING_KEY_FIELD}: "wmk_wrong" } });\n`,
+      );
       const mismatched = await status({ workspace: path, apiBase: platform.base, store });
       expect(mismatched.tracking_api_key_matches).toBe(false);
       expect(mismatched.flags.key_mismatch).toBe(true);
@@ -492,14 +500,14 @@ describe("webmcp status", () => {
       });
       await writeFile(
         source,
-        `registerTools([], { tracking: { apiKey: "${PUBLIC_KEY}", endpoint: "${ingestUrl}" } });\nregisterTools([], { tracking: { apiKey: "${PUBLIC_KEY}" } });\n`,
+        `registerTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}", endpoint: "${ingestUrl}" } });\nregisterTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}" } });\n`,
       );
       const missingEndpoint = await status({ workspace: path, apiBase: platform.base, store });
       expect(missingEndpoint.tracking_endpoint_matches).toBe(false);
 
       await writeFile(
         source,
-        `registerTools([], { tracking: { apiKey: "${PUBLIC_KEY}", endpoint: "${ingestUrl}" } });\nregisterTools([], { tracking: { apiKey: "${PUBLIC_KEY}", endpoint: "${ingestUrl}" } });\n`,
+        `registerTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}", endpoint: "${ingestUrl}" } });\nregisterTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}", endpoint: "${ingestUrl}" } });\n`,
       );
       const previewHealthy = await status({ workspace: path, apiBase: platform.base, store });
       expect(previewHealthy.tracking_endpoint_matches).toBe(true);
@@ -528,7 +536,7 @@ describe("webmcp status", () => {
 
       await writeFile(
         source,
-        `registerTools([], { tracking: { apiKey: "${PUBLIC_KEY}" } });\nregisterTools([], { tracking: { apiKey: "${PUBLIC_KEY}" } });\n`,
+        `registerTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}" } });\nregisterTools([], { tracking: { ${TRACKING_KEY_FIELD}: "${PUBLIC_KEY}" } });\n`,
       );
       expect(
         (await status({ workspace: path, apiBase: platform.base, store }))

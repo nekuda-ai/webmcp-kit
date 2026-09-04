@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "webmcp-kit",
+  "version": "0.7.0",
+  "description": "A coding-agent plugin that maps web-app journeys in a visual Explorer, implements approved WebMCP tools through the app's own logic, and verifies them in a real browser.",
+  "author": {
+    "name": "nekuda",
+    "url": "https://github.com/nekuda-ai"
+  },
+  "homepage": "https://docs.nekuda.ai",
+  "repository": "https://github.com/nekuda-ai/webmcp-kit",
+  "license": "MIT",
+  "keywords": [
+    "webmcp",
+    "model-context",
+    "browser-agents",
+    "agent-skills",
+    "web-development"
+  ]
+}

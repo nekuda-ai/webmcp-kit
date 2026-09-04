@@ -8,6 +8,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 
 const src = readFileSync(
   join(import.meta.dir, "..", "skills", "implement", "interactive", "explorer.html"),
@@ -21,11 +22,11 @@ function lift(name: string): string {
   return src.slice(at, src.indexOf("\n}", at) + 2);
 }
 
-const render = new Function(`
+const render = runInNewContext(`(() => {
   ${src.match(/^var ESCAPES=.*$/m)?.[0]}
   ${["Html", "safeStr", "esc", "inlineMd", "mdHtml"].map(lift).join("\n")}
   return function(text){return mdHtml(text).h}
-`)() as (text: unknown) => string;
+})()`) as (text: unknown) => string;
 
 test("markup in the reply is escaped, inside spans too", () => {
   expect(render('<img src=x onerror="alert(1)">')).toBe(

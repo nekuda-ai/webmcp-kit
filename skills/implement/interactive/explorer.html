@@ -1,0 +1,2512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebMCP Kit Explorer</title>
+<!-- The same nekuda mark as the header, as a data: URI — the plugin ships one file and
+     carries no asset, so a /favicon.png would 404. Square viewBox so the tab icon is not
+     letterboxed. CSP needs `img-src data:`: Chromium runs the favicon fetch through it. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='22.625 0.87 237.632 237.632'%3E%3Crect x='22.625' y='13.7695' width='237.632' height='211.832' rx='105.916' fill='%23fff'/%3E%3Crect x='81.538' y='72.683' width='119.806' height='94.006' rx='47.003' fill='%2300BFFF'/%3E%3C/svg%3E">
+<!-- The state folder is untrusted input. CSP is the backstop behind the escaping in
+     the page script: no inline handlers, no eval, nothing loadable but pinned driver.js.
+     The two script hashes and the style hash cover this file's inline blocks —
+     regenerate them if you edit any inline style or script block. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-H2PZefWdV9cbGszOn24X2sV28/4/Rm2qhm0lOc4x+o8=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-oA7Q/p0pkPC0dBhyyNpIbgmodhWPqTxM6q+yFgT/+Oo=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css" integrity="sha384-XUGWln86d3kDvw/W1Qbii8QQyeWs2LcFYfGhYrmSZ0ZiXxowttKpfdhPdLE+WMFx" crossorigin="anonymous">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("webmcp-explorer-theme")||"light"}catch(e){}</script>
+<style>:root{--bg:#f6f7f6;--panel:#fff;--ink:#222624;--muted:#737975;--line:#dfe3e0;--blue:#279cff;--blue-bg:#eef8ff;--green:#41865f;--green-bg:#eef6f1;--gold:#987627;--gold-bg:#fbf6e8;--red:#b55545;--red-bg:#fff1ee;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+*{box-sizing:border-box}
+html, body{margin:0;min-width:1050px;min-height:760px;overflow:auto}
+button, textarea{font:inherit;color:inherit}
+.app{height:100vh;min-height:760px;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 26px;border-bottom:1px solid var(--line);background:#fafbfa}
+.brand{display:flex;align-items:center;gap:11px;font:700 12px var(--mono)}
+/* The nekuda mark alone — no wordmark — inline so the published plugin carries no
+   asset: the tile's white ring vanishes into a light page and reads as the full
+   tile on a dark one, so one copy works in both themes.
+   The mark is two filled stadiums, NOT a blue disc under a white ring stroke. The
+   ring's outer edge sat at radius 105.91605 and the disc's at 105.91600 — coincident
+   to rounding — so every antialiased edge pixel got partial blue, then partial white
+   over it, and the blue underneath survived in the seam: a dotted #C9EDFD halo
+   around the tile on a light page. Keep the two edges at different radii. */
+.logo{display:block;flex:none;height:22px}
+.logo svg{display:block;height:100%;width:auto}
+.logo:hover{opacity:.75}
+.dim{color:var(--muted)}
+.top-actions{display:flex;align-items:center;gap:8px}
+.chip{min-height:30px;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--muted);font-size:11px}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+/* min-width:0 all the way down. A grid/flex item defaults to min-width:auto, i.e. its own
+   min-content, so without this the widest thing inside the tree panel became a hard floor
+   for the panel, the workspace and the whole app — the page stopped shrinking at 1050px and
+   simply overflowed the viewport below that. The scrollers inside are what should absorb it. */
+.workspace{min-width:0;min-height:0;display:grid;grid-template-columns:44% 56%;gap:12px;padding:12px 16px}
+.panel{min-width:0;min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 1px 2px #1c231e0a,0 8px 24px #1c231e09}
+.eyebrow{font:700 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#5f6661}
+.tree-panel{min-width:0;display:grid;grid-template-rows:minmax(0,1fr)}
+.controls{display:flex;align-items:center;gap:8px}
+.seg{display:flex;padding:3px;border:1px solid var(--line);border-radius:9px;background:#f4f5f4}
+.seg button{height:27px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:11px;cursor:pointer}
+.seg button.active{background:#fff;color:var(--ink);box-shadow:0 1px 2px #00000015}
+.check{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto;padding:0;border:1px solid #aeb6b0;border-radius:5px;background:#fff;color:#fff;font-size:10px;cursor:pointer}
+.check.on{border-color:var(--blue);background:var(--blue)}
+.check.mixed{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+.tree-scroll{min-width:0;min-height:0;overflow:auto;padding:20px}
+/* First two map columns are `max-content`, never `minmax(<px>,max-content)`: a fixed track
+   min disables the grid item's own min-content floor, so a squeezed track drags a node
+   narrower than its nowrap label and the text spills through the border. The old px floors
+   were tuned for the 11px .node font and never revisited when it went to 18px. */
+.map{display:grid;grid-template-columns:max-content minmax(225px,1fr);gap:20px;align-items:start}
+.node{position:relative;min-height:44px;display:flex;align-items:center;gap:8px;margin-top:9px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:600 11px var(--mono);white-space:nowrap}
+.page{border-color:#6ebcff;background:#fbfdff}
+.page-count{margin-left:auto;padding:4px 6px;border-radius:99px;background:#f0f2f1;color:var(--muted);font:10px var(--mono)}
+.tools{display:flex;flex-direction:column;gap:8px}
+.tool{position:relative;min-height:44px;display:flex;align-items:center;gap:9px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
+.tool:hover{border-color:#b7d9f6}
+.tool.active{border-color:#56afff;background:var(--blue-bg)}
+.tool.off{opacity:.55;background:#f8f8f8}
+.tool.off .tool-name{text-decoration:line-through}
+.tool-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px var(--mono)}
+.tree-scroll.outline-mode .map{display:none}
+.detail{display:grid;grid-template-rows:82px 44px minmax(0,1fr)}
+.detail-head{display:block;padding:15px 18px;border-bottom:1px solid var(--line)}
+.detail-head-top{display:flex;align-items:center;gap:8px}
+.detail-head-top h1{flex:1 1 auto;min-width:0;margin:0;overflow-wrap:anywhere;font:700 14px var(--mono)}
+.title-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:7px}
+.title-row h1{flex:0 0 100%}/* the status pill breaks to its own line under the name */
+.title-row h1{margin:0;font:700 14px var(--mono)}
+.selection{min-height:30px;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid #cfe4d5;border-radius:7px;background:var(--green-bg);color:var(--green);font-size:11px;cursor:pointer}
+.selection.off{border-color:#efd4ce;background:var(--red-bg);color:var(--red)}
+.detail-body{position:relative;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 244px}
+.content{min-width:0;overflow:auto;padding:20px 22px 70px}
+.field{margin-bottom:23px}
+.label{display:flex;align-items:center;gap:7px;margin-bottom:8px;color:var(--muted);font:700 9px var(--mono);letter-spacing:.13em;text-transform:uppercase}
+.label:before{content:"≡";font-size:12px}
+.annotatable{white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.7;cursor:text}
+.annotatable:hover{background:linear-gradient(90deg,#279cff0a,transparent)}
+.schema{display:grid;grid-template-columns:minmax(95px,.7fr) 70px minmax(140px,1.5fr);margin:-4px -13px 2px;font-size:10px}/* top bleeds to the summary separator */
+.schema div:nth-child(3n+1){padding-left:13px}
+.schema div:nth-child(3n){padding-right:13px}
+.schema div{padding:8px 9px;border-bottom:1px solid var(--line)}
+.schema div:nth-last-child(-n+3){border-bottom:0}
+.schema .sh{padding-top:13px;background:#f6f7f6;color:var(--muted);font:700 8px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.codebox{overflow:hidden;border:1px solid #313733;border-radius:10px;background:#171b19}
+.codehead{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid #2d332f;color:#9ca69f;font:10px var(--mono)}
+pre.annotatable{min-height:420px;margin:0;padding:15px;overflow:auto;background:#171b19;color:#dfe8e2;font:10.5px/1.68 var(--mono);tab-size:2}
+pre.annotatable:hover{background:#171b19}
+.decision-card{margin-bottom:11px;padding:13px;border:1px solid var(--line);border-radius:10px;background:#fcfdfc}
+.whole{width:100%;resize:vertical;padding:9px;border:1px solid var(--line);border-radius:8px;background:#fff;outline:none;font-size:11px;line-height:1.45}
+.whole{min-height:74px}
+.whole:focus, .general:focus{border-color:var(--blue);box-shadow:0 0 0 3px #279cff15}
+.small{min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:10px;cursor:pointer}
+.small.primary{border-color:var(--blue);background:var(--blue);color:#fff}
+.review{display:grid;grid-template-columns:1fr;align-items:center;padding:13px 12px;border-top:1px solid var(--line);background:#fafbfa;box-shadow:0 -8px 28px #181f1b08}
+.review strong{display:block;font-size:12px}
+.submit{flex:none;min-width:210px;min-height:47px;padding:0 17px;border:1px solid #1e83d9;border-radius:9px;background:var(--blue);color:#fff;font-weight:650;font-size:11px;cursor:pointer}
+.toast{position:fixed;z-index:80;left:50%;bottom:110px;transform:translate(-50%,15px);opacity:0;padding:8px 12px;border-radius:8px;background:#202522;color:#fff;pointer-events:none;transition:.18s;font-size:10px}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+/* v2: the map is the product; the inspector stays quiet until requested. */
+.workspace{grid-template-rows:34px minmax(0,1fr);grid-template-columns:minmax(690px,68%) minmax(330px,32%);gap:12px;padding:10px 16px 12px}
+.controls{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+.controls>.eyebrow{padding-left:6px}
+.seg{justify-self:center}
+.tree-scroll{padding:26px 28px}
+.map{position:relative;grid-template-columns:max-content minmax(268px,300px);column-gap:86px;justify-content:center}
+.node{min-height:44px;margin-top:10px;padding:0 14px;border-radius:11px}
+.tool{min-height:44px}
+.tool .tool-name{flex:0 1 auto;min-width:0}
+.tool .check{width:15px;height:15px;margin-left:auto;border-radius:4px;border-color:#c9d1cb;font-size:9px}
+.tool .check.on{border-color:var(--blue);background:var(--blue)}
+.tool-status{width:7px;height:7px;flex:none;border-radius:50%;background:var(--green)}
+.tool.off{opacity:.72;background:#fff}
+.tool-ghost{margin-top:14px;justify-content:flex-start;border-style:dashed;background:transparent;color:var(--muted);cursor:pointer}
+.tool-ghost:hover{border-color:#9ccdf5;color:var(--blue);background:var(--blue-bg)}
+.ghost-plus{font-size:14px;line-height:1}
+.tool-ghost .tool-name{color:inherit}
+.tool.off .tool-name{text-decoration:none;color:#909692}
+.detail{grid-template-rows:82px minmax(0,1fr)}
+.detail-body{display:block}
+.content{height:100%;padding:20px 20px 70px}
+.field{margin-bottom:20px}
+.disclosure{margin-bottom:9px;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+.disclosure>summary{min-height:46px;display:flex;align-items:center;gap:9px;padding:0 13px;list-style:none;cursor:pointer;font:650 10px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.disclosure>summary::-webkit-details-marker{display:none}
+.disclosure>summary:before{content:"›";font-size:18px;line-height:1;color:#8b928d;transition:transform .15s}
+.disclosure[open]>summary:before{transform:rotate(90deg)}
+.summary-count{margin-left:auto;min-width:21px;height:21px;display:grid;place-items:center;padding:0 6px;border-radius:99px;background:#eef1ef;color:#68706b;font:9px var(--mono)}
+.disclosure-body{padding:4px 13px 15px;border-top:1px solid var(--line)}
+.disclosure .field{margin:14px 0 0}
+.disclosure .decision-card{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:12px 0;background:transparent}
+.disclosure .decision-card:last-child{border-bottom:0}
+.disclosure pre.annotatable{min-height:360px}
+.feedback-copy{margin:9px 0 12px;color:var(--muted);font-size:10px;line-height:1.5}
+.whole{min-height:72px}
+.selection{padding:0 9px}
+.selection .check{display:none}
+/* v3: mirror the Demo Center's quiet canvas and fanned connection map. */
+.app{grid-template-rows:auto minmax(0,1fr) auto}
+.top{padding:0 17px}
+.logo{height:21px}
+.workspace{grid-template-columns:minmax(0,1fr) minmax(360px,420px);grid-template-rows:minmax(0,1fr);gap:12px;padding:12px}
+.panel{border-radius:12px;box-shadow:0 1px 2px #1c231e0a,0 10px 30px #1c231e08}
+.tree-panel{grid-template-rows:48px minmax(0,1fr)}
+.panel-head{padding:0 14px 0 20px}
+.tree-scroll{padding:28px 34px}
+.map{position:relative;isolation:isolate;grid-template-columns:max-content minmax(220px,255px);column-gap:90px;justify-content:center}
+.map>.node, .map>.tools{z-index:1}
+.node{min-height:44px;margin-top:10px;padding:0 14px;border-radius:10px;box-shadow:0 1px 2px #1c231e0a}
+.node:after, .tool:before, .page:before{display:none}
+.map-links{position:absolute;inset:0;z-index:0;width:100%;height:100%;overflow:visible;pointer-events:none;transition:opacity .14s ease-out}
+.map-links path{fill:none;stroke:#75c2ff;stroke-width:1.15;vector-effect:non-scaling-stroke}
+.tools{gap:8px}
+.tool{min-height:43px;padding:0 12px;border-radius:10px;grid-template-columns:9px minmax(0,1fr) 15px auto;box-shadow:0 1px 2px #1c231e08}
+.tool.active{border-color:#55b5ff;background:#edf8ff}
+.tool:not(.dupe):not(.tool-ghost):hover{border-color:#55b5ff;background:#edf8ff}
+.tool .check{width:15px;height:15px;border-radius:4px;font-size:9px}
+.tool .check.on{border-color:#78aa8b;background:#78aa8b}
+.tool-name{font-size:11px}
+.detail{grid-template-rows:72px minmax(0,1fr)}
+.detail-head{padding:13px 18px}
+.content{padding:18px 20px 54px}
+.field{margin-bottom:18px}
+.disclosure>summary{height:43px}
+.review{padding:10px 12px}
+.submit{height:44px;min-width:200px}
+.top-actions .chip:not(.status){display:none}
+@media(max-width:1220px){.workspace{grid-template-columns:minmax(0,1fr) 385px}
+.tree-scroll{padding:26px 20px}
+.map{grid-template-columns:max-content minmax(205px,220px);column-gap:54px}
+}
+/* Scope grouping: the third map column is a stack of scope groups, each a
+   [scope node | its tools] row, so page → scope → tool reads as a tree and
+   site-wide vs page/state-scoped tools are told apart at a glance. The tools
+   width moves from the .map track onto .scope-group so groups own their row. */
+.map{grid-template-columns:max-content max-content}
+/* The upstream nodes read as parents of the whole column, so they sit at its
+   vertical middle, not its first row. */
+.map>.page{align-self:center;margin-top:0}
+/* Shared auto-sized first track: .tools owns the two columns and each group
+   subgrids into them, so scope nodes, tool cards and the ghost "Request tool"
+   row all line up across groups while the label column fits its longest label. */
+.tools{display:grid;grid-template-columns:minmax(176px,max-content) minmax(220px,255px);column-gap:40px;row-gap:18px}
+.tools>.plan-warning,.tools>.empty-state{grid-column:1/-1}
+.scope-group{display:grid;grid-column:1/-1;grid-template-columns:subgrid;align-items:center}
+.scope-tools{min-width:0;display:flex;flex-direction:column;gap:8px}
+.scope-node{margin-top:0;max-width:100%;min-height:36px;padding:0 11px;font:600 10px var(--mono);color:var(--muted)}
+.scope-node svg{width:12px;height:12px;flex:none}
+.scope-node .scope-label{overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.scope-node .page-count{margin-left:2px}
+.scope-node.sk-undeclared{border-style:dotted;color:var(--gold)}
+.cond-mark{display:inline-flex;flex:none;margin-left:auto;color:var(--muted)}
+.cond-mark svg{width:10px;height:10px}
+.tool .cond-mark+.check{margin-left:8px}
+.scope-chips{display:inline-flex;gap:5px;min-width:0}
+.scope-chip.sc-cond{border-style:dashed}
+.scope-tools .tool-ghost{margin-top:0}
+.scope-chip{display:inline-flex;align-items:center;gap:5px;min-height:20px;padding:0 8px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font:500 9.5px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scope-chip svg{width:10px;height:10px;flex:none}
+.scope-chip.sc-undeclared{border-style:dotted;color:var(--gold)}
+.scope-line{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.scope-note{color:var(--muted);font-size:11px}
+/* Narrow screens cap the whole .map, so a minmax() floor would win over the
+   label — a rigid max-content track keeps labels whole and lets the pannable
+   canvas absorb the overflow instead. */
+@media(max-width:1220px){.tools{grid-template-columns:max-content minmax(205px,220px);column-gap:24px}.scope-node .scope-label{max-width:220px}}
+/* v4 polish */
+:root{--panel-soft:#fafbfa;--code:#f7f9fb;--code-head:#f1f4f6;--shadow:#1c231e0a;--review-h:140px;--detail-w:420px;color-scheme:light}
+:root[data-theme="dark"]{--bg:#121614;--panel:#191e1b;--panel-soft:#161b18;--ink:#e7ece8;--muted:#949d97;--line:#303833;--blue:#58b3ff;--blue-bg:#172a36;--green:#78bd91;--green-bg:#17271d;--gold:#d2ae56;--gold-bg:#2c2516;--red:#dc8577;--red-bg:#311e1b;--code:#111613;--code-head:#171d19;--shadow:#0005;color-scheme:dark}
+.app{grid-template-rows:auto minmax(0,1fr) var(--review-h)}
+.workspace{position:relative;grid-template-columns:minmax(0,1fr) var(--detail-w)}
+.top, .review{background:var(--panel-soft)}
+.panel, .tool, .node, .disclosure, .selection, .small, .chip{background:var(--panel)}
+.seg{background:var(--panel-soft)}
+.seg button.active{background:var(--panel)}
+.schema .sh{background:var(--panel-soft);color:var(--muted)}
+.detail-resizer{position:absolute;z-index:18;top:12px;bottom:12px;right:calc(var(--detail-w) + 6px);width:12px;padding:0;border:0;background:transparent;cursor:col-resize;touch-action:none}
+.detail-resizer:after{content:"";position:absolute;top:10px;bottom:10px;left:5px;width:2px;border-radius:99px;background:transparent;transition:background .14s,box-shadow .14s}
+.detail-resizer:hover:after, .detail-resizer:focus-visible:after, .detail-resizer.dragging:after{background:var(--blue);box-shadow:0 0 0 3px #279cff20}
+.detail-resizer:focus-visible{outline:0}
+.detail-close{width:28px;height:28px;flex:none;margin-left:8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:16px;cursor:pointer}
+.detail-close:hover{background:var(--panel-soft);color:var(--ink)}
+.top-actions{position:relative}
+.top-button{height:30px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);font-size:11px;cursor:pointer}
+.top-button:hover{color:var(--ink);border-color:#9ba69f}
+/* Hover feedback for the rest of the controls. .small, .seg button, .check and .submit are
+   the most-clicked things on the page and had no :hover rule at all — Add note, Build status,
+   Save, Send, the pick checkboxes and the primary button all sat dead under the pointer while
+   the header buttons lit up. Same idiom as .top-button above: firm the border, lift the fill a
+   step. Filled variants restate their own fill so the neutral .small:hover cannot flatten them,
+   and :not() keeps the active segment and a busy submit out of it. */
+.small:hover{border-color:#9ba69f;background:var(--panel-soft)}
+.small.primary:hover{border-color:#1a76c4;background:#1f92f0}
+.seg button:not(.active):hover{color:var(--ink);background:#1c231e0a}
+.check:hover{border-color:var(--blue)}
+.check.on:hover{border-color:#1a76c4;background:#1f92f0}
+.submit:not(:disabled):not(.is-busy):hover{border-color:#1a76c4;background:#1f92f0}
+/* Text fields get the same border cue as the buttons — they are targets too. */
+.conv-composer input:hover,textarea:hover{border-color:#9ba69f}
+.top-button svg{width:13px;height:13px}
+/* The one outbound ask on the page, so it is the one button allowed to look like an
+   invitation: gold tint against the neutral utilities, and it lifts on hover. No live
+   star count — that needs api.github.com in a CSP whose whole job is to allow nothing,
+   and a rendered "0" asks less well than no number at all. */
+a.top-button.star-button{color:var(--gold);border-color:#e0cd99;background:var(--gold-bg);font-weight:650;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+a.top-button.star-button:hover{color:var(--gold);border-color:#c9ab5c;transform:translateY(-1px);box-shadow:0 3px 9px #9876271f}
+a.top-button.star-button:active{transform:translateY(0) scale(.985);box-shadow:none}
+/* Hierarchy is octocat → "Star" → glyph, so the glyph is the quietest of the three: ~65% of
+   the octocat and held under full strength so it reinforces the word rather than competing
+   with it. Sized in em, not px — the octocat grows 13px → 17px at the large breakpoint, and
+   a fixed px glyph silently drifted to 53% of it there.
+   margin-left balances the optical gaps: `gap` is only 3px on an anchor, and the &nbsp;
+   before "Star" pads its left, so the right side needs the same few px back.
+   It stays FILLED in every state: we cannot read the viewer's real GitHub star state, and
+   a hollow star would keep promising an "unstarred" fact we do not have. Feedback is
+   motion, not fill — a 4% swell on hover, a nudge back on press. */
+.top-button .star-glyph{width:.72em;height:.72em;margin-left:.25em;opacity:.62;transition:transform .12s ease,opacity .12s ease}
+a.top-button.star-button:hover .star-glyph{opacity:.9;transform:scale(1.04)}
+a.top-button.star-button:active .star-glyph{transform:scale(.96) rotate(-8deg)}
+:root[data-theme="dark"] a.top-button.star-button{border-color:#584a26}
+:root[data-theme="dark"] a.top-button.star-button:hover{border-color:#8a7238;box-shadow:0 3px 9px #d2ae5626}
+.tour-invite{position:absolute;z-index:45;top:38px;right:72px;width:242px;display:none;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 14px 38px #1118}
+.tour-invite.show{display:block}
+.tour-invite strong{display:block;font-size:12px}
+.tour-invite p{margin:5px 0 10px;color:var(--muted);font-size:10.5px;line-height:1.45}
+.tour-invite-actions{display:flex;justify-content:flex-end;gap:7px}
+.tree-panel{grid-template-rows:48px minmax(0,1fr)}
+.panel-head{display:flex;align-items:center;justify-content:space-between}
+.controls{display:block}
+.tree-scroll{padding-top:18px}
+.detail{grid-template-rows:auto minmax(0,1fr)}
+.detail-head{padding:16px 18px}
+.title-row{margin-top:8px;align-items:flex-start;flex-wrap:wrap;row-gap:5px}
+.title-row h1{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.selection{flex:none}
+.detail-body, .content{width:100%;min-width:0}
+.content{padding:20px 18px 46px;overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable;overscroll-behavior:contain}
+.disclosure>summary{min-height:45px}
+.annotatable{cursor:default}
+.annotatable:hover{background:transparent}
+.codebox{width:100%;min-width:0;border-color:var(--line);background:var(--code)}
+.codehead{border-bottom-color:var(--line);background:var(--code-head);color:var(--muted)}
+pre.codeview{width:100%;min-width:0;min-height:360px;margin:0;padding:15px;overflow:auto;background:var(--code);color:#26312b;font:10.5px/1.68 var(--mono);tab-size:2}
+.tok-comment{color:#738078;font-style:italic}
+.tok-string{color:#a54b2a}
+.tok-keyword{color:#7557ad;font-weight:600}
+.tok-number{color:#147c74}
+:root[data-theme="dark"] pre.codeview{color:#dce7df}
+:root[data-theme="dark"] .tok-comment{color:#78867e}
+:root[data-theme="dark"] .tok-string{color:#dfa37d}
+:root[data-theme="dark"] .tok-keyword{color:#c2a6ff}
+:root[data-theme="dark"] .tok-number{color:#6ac9bd}
+.tool{grid-template-columns:9px minmax(0,1fr) 15px}
+.tool.off{opacity:.52;background:var(--panel)}
+.tool.off .tool-name{text-decoration:line-through;text-decoration-thickness:1px}
+.tool .check{margin-left:auto}
+.tool .check{margin-left:auto}
+.tool-feedback-status{color:var(--muted);font-size:9px}
+.tour-section{max-height:calc(100% - 18px);overflow:auto}
+.review{position:relative;align-items:stretch;min-height:0;overflow:hidden;padding:28px 12px 28px}
+.review-resizer{position:absolute;inset:0 0 auto;height:13px;border:0;background:transparent;cursor:row-resize;touch-action:none}
+.review-resizer:after{content:"";position:absolute;top:5px;left:50%;width:46px;height:3px;transform:translateX(-50%);border-radius:99px;background:#bbc3be}
+.review-resizer:hover:after, .review-resizer.dragging:after{background:var(--blue)}
+.submit{align-self:center}
+.toast{bottom:calc(var(--review-h) + 18px)}
+.driver-popover.webmcp-tour{--driver-popover-font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:300px;border:1px solid var(--line);border-radius:11px;background:var(--panel);color:var(--ink);box-shadow:0 18px 55px #0003}
+.webmcp-tour .driver-popover-title{font-size:14px}
+.webmcp-tour .driver-popover-description{color:var(--muted);font-size:11px;line-height:1.5}
+.webmcp-tour .driver-popover-footer-btn{border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);text-shadow:none}
+.webmcp-tour .driver-popover-next-btn{border-color:var(--blue);background:var(--blue);color:#fff}
+:root[data-theme="dark"] .driver-active-element{outline:3px solid var(--blue)!important;outline-offset:3px;box-shadow:0 0 0 7px #58b3ff38!important}
+:root[data-theme="dark"] .driver-popover.webmcp-tour{border-color:#58b3ff;background:#222a25;color:#f4f8f5;box-shadow:0 22px 70px #000a}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-title{color:#fff}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-description, :root[data-theme="dark"] .webmcp-tour .driver-popover-progress-text{color:#c3cec7}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-footer-btn{border-color:#4a5650;background:#19201c;color:#edf4ef}
+:root[data-theme="dark"] .webmcp-tour .driver-popover-next-btn{border-color:#58b3ff;background:#58b3ff;color:#08131a}
+:root[data-theme="dark"] .top, :root[data-theme="dark"] .review, :root[data-theme="dark"] .panel-head{background:var(--panel-soft)}
+:root[data-theme="dark"] .panel, :root[data-theme="dark"] .tool, :root[data-theme="dark"] .node, :root[data-theme="dark"] .disclosure, :root[data-theme="dark"] .selection, :root[data-theme="dark"] .small, :root[data-theme="dark"] .chip, :root[data-theme="dark"] .general, :root[data-theme="dark"] textarea{background:var(--panel);color:var(--ink)}
+:root[data-theme="dark"] .tool.active{background:var(--blue-bg)}
+/* Iteration loop: review → agent works → the interactive plan changes in place. */
+.top-button[hidden]{display:none}
+.submit{position:relative}
+.submit:disabled{cursor:wait;opacity:.72}
+/* Waiting on the coding agent: a disabled button whose label just changed reads
+   as "nothing is happening" — the spinner says the run is alive. */
+.submit.is-busy{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.submit.is-busy::before{content:"";width:13px;height:13px;flex:none;border:2px solid #ffffff66;border-top-color:#fff;border-radius:50%;animation:spin .85s linear infinite}
+@media (prefers-reduced-motion:reduce){.submit.is-busy::before{animation:none}}
+@keyframes spin{to{transform:rotate(360deg)}
+}
+/* A real modal: while the card is up, the rest of the page is inert. */
+.agent-stage{margin:auto;padding:0;border:0;background:transparent;overflow:visible}
+.agent-stage::backdrop{background:#f4f7f5e8;backdrop-filter:blur(4px)}
+:root[data-theme="dark"] .agent-stage::backdrop{background:#0d110fe8}
+.agent-card{width:max-content;min-width:380px;max-width:min(680px,92vw);max-height:88vh;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 26px 80px #1115}
+.agent-card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px 18px 30px;border-bottom:1px solid var(--line)}
+.agent-card-head h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.agent-close{width:30px;height:30px;display:grid;place-items:center;flex:none;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);cursor:pointer}
+.agent-close:hover{color:var(--ink)}
+.agent-card-body{min-height:0;overflow:auto;padding:40px 30px}
+/* Checklist rows: one icon + one phrase per tool; the active row's spinner carries liveness. */
+.agent-processing{text-align:left}
+.agent-spinner{width:15px;height:15px;flex:none;border:2px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .85s linear infinite}
+.row-ico{width:15px;flex:none;text-align:center;font:700 14px var(--mono)}
+.row-ico.ok{color:var(--green)}
+.row-ico.bad{color:var(--red)}
+.row-ico.warn{color:var(--gold)}
+.row-ico.idle{color:var(--muted)}
+.row-phrase{color:var(--muted)}
+/* Live lens over the state folder: connection, status lifecycle, change flash, conversation. */
+.tool-status{background:var(--muted)}
+.tool-status.st-building{background:var(--gold);animation:beat 1.1s ease-in-out infinite}
+.tool-status.st-review{background:var(--blue)}
+.tool-status.st-approved{background:var(--green)}
+@keyframes beat{50%{opacity:.28}
+}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:99px;background:var(--panel-soft);color:var(--muted);font:700 9px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.status-pill i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.status-pill.st-building{background:var(--gold-bg);color:var(--gold)}
+.status-pill.st-review{background:var(--blue-bg);color:var(--blue)}
+.status-pill.st-approved{background:var(--green-bg);color:var(--green)}
+/* Ephemeral change highlight — what moved between the last two updates. Never stored. */
+@keyframes flashmark{0%{box-shadow:0 0 0 2px var(--blue),0 0 0 6px #279cff26}
+70%{box-shadow:0 0 0 2px var(--blue),0 0 0 6px #279cff26}
+100%{box-shadow:0 0 0 0 #279cff00,0 0 0 0 #279cff00}
+}
+.flash{animation:flashmark 2.4s ease-out}
+.flash-tag{margin-left:auto;padding:2px 6px;border-radius:99px;background:var(--blue-bg);color:var(--blue);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase;animation:fadeout 2.4s ease-out forwards}
+@keyframes fadeout{75%{opacity:1}
+100%{opacity:0}
+/* Conversation with the agent lives beside the composer that produces it. */
+}
+
+.conversation{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px}
+.conversation .conv-label{color:var(--muted);font:700 9px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.chat{min-height:0;overflow:auto;padding:2px 0 0;display:grid;gap:5px;align-content:start}
+.msg{padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-size:11px;line-height:1.45}
+.msg .who{display:block;color:var(--muted);font:700 8px var(--mono);letter-spacing:.07em;text-transform:uppercase}
+/* Markdown-lite blocks from mdHtml(): paragraphs carry the rhythm, bullets and
+   code spans carry the tool lists the agent writes. */
+.msg p{margin:0 0 .7em}
+.msg p:last-child,.msg ul:last-child{margin-bottom:0}
+.msg ul{margin:0 0 .7em;padding-left:1.15em;display:grid;gap:.3em}
+.msg li{margin:0}
+.msg li::marker{color:var(--muted)}
+/* Two classes deep on purpose: `.review strong` and `.chat-modal strong` both
+   make strong a block, and a bubble's bold is inline. */
+.msg p strong,.msg li strong{display:inline;font:inherit;font-weight:650}
+.msg code{padding:1px 4px;border-radius:4px;background:var(--code);border:1px solid var(--line);font:.92em var(--mono);word-break:break-word}
+.msg.claude{background:var(--blue-bg);border-color:#cfe2f5}
+:root[data-theme="dark"] .msg{background:var(--panel)}
+:root[data-theme="dark"] .msg.claude{background:#152230;border-color:#20374d}
+.chat .chat-empty{color:var(--muted);font-size:10.5px}
+.review-actions{display:flex;align-items:center;justify-content:flex-end;min-width:0}
+#statusBox{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-note{flex:none;white-space:nowrap}
+.stage-open{flex:none;white-space:nowrap;border-color:#b9daf5;background:var(--blue-bg);color:var(--blue)}
+.stage-open[hidden]{display:none}
+:root[data-theme="dark"] .stage-open{border-color:#28455c}
+/* Labels sit beside their glyph, never wrapped under it. */
+.seg button{white-space:nowrap}
+.panel-head .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.panel-head .seg,.panel-head .canvas-zoom{flex:none}
+/* Until a conversation exists the footer is just the Submit row. */
+/* The sentence is the elastic part: it ellipsizes so "Add note" and the submit button keep
+   their shape. Before this the text wrapped to six lines and pushed the submit off the edge. */
+.status-bar{display:flex;align-items:center;gap:14px;min-height:46px;min-width:0;padding:6px 8px 6px 14px;border-top:1px solid var(--line);background:var(--panel-soft);color:var(--ink);font-size:11px;line-height:1.5}
+.status-bar .submit{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:none;min-width:128px;align-self:stretch;min-height:0;padding:0 14px}/* matches the Add-note button */
+.status-bar .submit svg{width:17px;height:17px;flex:none}
+.status-bar>span{flex:1 1 auto;min-width:0}
+.status-note{display:inline-flex;align-items:center;gap:6px;flex:none;align-self:stretch;padding:0 14px}
+.status-note svg{width:19px;height:19px}
+.status-note.has-content{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue)}
+.tree-panel{position:relative}
+.side-rail{position:absolute;top:64px;right:12px;z-index:24;display:flex;flex-direction:column;gap:8px}
+.rail-button{width:62px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px 7px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font-size:9px;cursor:pointer}
+.rail-button svg{width:16px;height:16px}
+.rail-button:hover:not(:disabled), .rail-button.has-content{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue)}
+.rail-button:disabled{opacity:.45;cursor:not-allowed}
+.rail-flyout{width:340px;max-width:86vw;margin:auto;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:0 24px 64px #1119}
+.rail-flyout::backdrop{background:#1c231e59;backdrop-filter:blur(1.5px)}
+.rail-flyout header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.rail-flyout strong{font:650 11px var(--mono)}
+.rail-flyout-close{width:25px;height:25px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.rail-flyout-close:hover{background:var(--panel-soft);color:var(--ink)}
+.rail-flyout textarea{width:100%;min-height:84px;resize:vertical;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-size:11px;line-height:1.45;outline:none}
+.rail-flyout textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #279cff15}
+.rail-flyout footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}
+.rail-count{color:var(--muted);font:10px var(--mono)}
+.note-actions{display:flex;align-items:center;gap:8px;margin-top:9px}
+.note-actions .spacer{flex:1}
+/* Build progress replaces the mockup's simulated diff stage — same frame, real data. */
+.build-list{display:grid;gap:9px;text-align:left}
+/* The build card's progress block. `<progress>` rather than a div pair: it carries its own
+   role and value for a screen reader, and an indeterminate bar is just the attribute left
+   off — which is exactly the state before the first tool finishes. */
+.stage-progress{margin-bottom:22px;text-align:left}
+.stage-progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:9px}
+.stage-eta{color:var(--muted);font-variant-numeric:tabular-nums}
+.stage-bar{appearance:none;width:100%;height:7px;border:0;border-radius:99px;background:var(--line);overflow:hidden}
+.stage-bar::-webkit-progress-bar{background:var(--line);border-radius:99px}
+.stage-bar::-webkit-progress-value{background:var(--blue);border-radius:99px;transition:width .3s ease}
+.stage-hint{margin-top:22px;display:flex;align-items:center;gap:14px;padding:13px 15px;border-radius:10px;background:var(--blue-bg);color:var(--ink);text-align:left}
+/* No chip behind it: the glow IS the light. Two flat currentColor discs rather than a
+   radialGradient — WebKit is unreliable with currentColor inside gradient stops, and at
+   .06/.08 the two steps are indistinguishable from a true gradient. Everything keys off
+   --blue, so the dark theme needs no override of its own. */
+.stage-hint-badge{flex:none;color:var(--blue)}
+.stage-hint-badge svg{display:block;width:38px;height:38px}
+.stage-hint strong{display:block;font-size:13px}
+.stage-hint p{margin:4px 0 0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.agent-card-foot{display:flex;justify-content:flex-end;padding:14px 30px;border-top:1px solid var(--line)}
+.connect-card{position:relative;width:min(520px,92vw);min-width:380px;display:block}
+.connect-card-body{display:grid;gap:24px;padding:38px 34px;text-align:center}
+.connect-card-body h2{margin:0;font-size:24px;letter-spacing:-.025em}
+.connect-copy{max-width:390px;margin:-10px auto 0;color:var(--muted);font-size:14px;line-height:1.55}
+.connect-actions{display:flex;justify-content:center;gap:10px}
+.connect-actions .small{min-width:170px}
+.connect-actions .primary{border-color:#1e83d9;background:var(--blue);color:#fff}
+.connect-actions .primary:hover:not(:disabled){filter:brightness(1.06)}
+.connect-actions button:disabled{cursor:wait;opacity:.62}
+.connect-close{position:absolute;top:14px;right:14px}
+.small.danger{border-color:#e6c4bd;background:var(--red-bg);color:var(--red)}
+.small.danger:hover{border-color:var(--red);background:#ffe9e4}
+.confirm::backdrop{background:#1c231e5c}
+.confirm{max-width:min(420px,92vw);padding:0;border:0;background:transparent}
+.confirm-card{padding:20px 22px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 26px 80px #1115;text-align:left}
+.confirm-card strong{display:block;font-size:15px}
+.confirm-card p{margin:7px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
+.confirm-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:17px}
+.build-row{display:flex;align-items:center;gap:10px}
+.build-row.bare{justify-content:center}
+.build-row strong{font:650 11.5px var(--mono)}
+.empty-state{padding:26px 20px;color:var(--muted);font-size:11.5px;line-height:1.6;text-align:center}
+/* Several mockup rules set an explicit display, which beats the hidden attribute. */
+[hidden]{display:none!important}
+
+/* Round-2 additions: unknown-value fallbacks, the state-folder overflow panel. */
+.dot-live{color:var(--green)}
+.extras{max-width:756px;margin:12px auto 0}
+.extra-file{margin-top:8px}
+.extra-file b{font:650 10px var(--mono)}
+.extra-file pre{max-height:180px;margin:6px 0 0;padding:9px;overflow:auto;border-radius:8px;background:var(--panel-soft);font:9.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
+.chat-earlier{justify-self:start;margin-bottom:2px}
+.msg.typing .dots{display:inline-flex;gap:4px;align-items:center;height:12px}
+.msg.typing .dots i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.25;animation:typing 1.2s infinite}
+.msg.typing .dots i:nth-child(2){animation-delay:.2s}
+.msg.typing .dots i:nth-child(3){animation-delay:.4s}
+@keyframes typing{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.tool-status.st-declined{background:var(--red);opacity:.5}
+.status-pill.st-declined{background:var(--red-bg);color:var(--red)}
+.node.page{max-width:420px;overflow:hidden}
+#journeyLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-warning{margin-bottom:8px;padding:9px 11px;border:1px solid #ead4cf;border-radius:9px;background:var(--red-bg);color:var(--red);font-size:10.5px;line-height:1.5}
+.tool.dupe{opacity:.6;cursor:default}
+.dupe-badge{margin-left:auto;padding:3px 7px;border-radius:99px;background:var(--red-bg);color:var(--red);font:700 8px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+.extra-file button{margin-top:6px}
+/* NEK-711: readable laptop scale and a review-first first-run hierarchy. */
+:root{--review-h:250px;--canvas-zoom:.75}
+body{font-size:18px}
+.app{grid-template-rows:minmax(96px,auto) minmax(0,1fr) var(--review-h)}
+.top{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:20px;padding:10px 18px}
+.brand-stack{min-width:0;display:grid;gap:5px}
+.brand{font-size:18px;white-space:nowrap;min-width:0}
+.logo{height:30px}
+/* min-width:0 lets the track shrink; overflow-x keeps the row inside it. Without both, a
+   nowrap phase row grows past its column and paints over the buttons beside it. */
+.phase-steps{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.phase-steps::-webkit-scrollbar{display:none}
+/* Tight enough that five steps at this size fit a 1400px laptop without the row having to
+   scroll — it can scroll now rather than paint over the buttons, but scrolling a five-item
+   phase indicator is a worse answer than fitting. */
+.phase-step{display:inline-flex;align-items:center;gap:6px;padding:7px 7px;border:1px solid transparent;border-radius:8px;color:var(--muted);font:650 16px var(--mono);white-space:nowrap}
+.phase-step:before{content:"";width:8px;height:8px;flex:none;border:2px solid currentColor;border-radius:50%}
+.phase-step.complete{color:var(--green)}
+.phase-step.complete:before{background:currentColor}
+.phase-step.current{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue);box-shadow:0 0 0 2px #279cff14}
+.phase-step.current:before{background:currentColor;box-shadow:0 0 0 3px #279cff20}
+.chip,.top-button{min-height:40px;font-size:16px}
+.top-actions{gap:9px}
+.top-button:disabled{cursor:not-allowed;opacity:.45}
+.eyebrow,.label,.schema .sh,.conversation .conv-label,.msg .who{font-size:15px}
+.seg button,.node,.tool-name,.selection,.annotatable,.schema,.whole,.small,.status-bar,.rail-flyout textarea,.submit,.toast,.tour-invite p,.feedback-copy,.msg,.chat .chat-empty,.empty-state,.plan-warning{font-size:18px}
+.page-count,.disclosure>summary,.summary-count,.codehead,.status-pill,.tool-feedback-status,.flash-tag,.dupe-badge,.extra-file b,.extra-file pre{font-size:16px}
+.detail-head-top h1{font-size:24px}
+.tour-invite strong,.rail-flyout strong,.build-row strong{font-size:20px}
+.rail-button{width:80px;font-size:12px}
+.rail-button svg{width:20px;height:20px}
+.rail-flyout{width:400px}
+.rail-count{font-size:13px}
+pre.annotatable,pre.codeview{font-size:17px;line-height:1.6}
+.webmcp-tour .driver-popover-title{font-size:20px}
+.webmcp-tour .driver-popover-description,.webmcp-tour .driver-popover-progress-text{font-size:18px}
+.webmcp-tour .driver-popover-footer-btn{font-size:16px}
+.check{width:22px;height:22px;font-size:15px}
+.tool .check{width:21px;height:21px;font-size:14px}
+.panel-head,.tree-panel{min-height:58px}
+.tree-panel{grid-template-rows:minmax(58px,auto) minmax(0,1fr)}
+.node{min-height:58px}
+.tool{min-height:58px}
+.selection,.small{min-height:40px}
+.disclosure>summary{min-height:56px}
+.whole{min-height:94px}
+.review{align-items:stretch;padding:10px 12px 12px;grid-template-rows:minmax(0,1fr) auto;gap:10px}
+/* One centered column: thread, header and composer share the same width,
+   so the send button sits at the thread's edge instead of the far screen edge. */
+.conversation{grid-template-rows:auto minmax(0,1fr);gap:10px;width:100%;margin:0}
+.chat{gap:8px}
+.submit{min-width:170px;height:42px}
+.status-bar{min-height:40px;padding:5px 6px 5px 12px;font-size:16px}
+/* Long status text must never squeeze the buttons or wrap their labels. */
+.status-bar .small{min-height:36px;flex:none;white-space:nowrap}
+/* The thread column uses ~60% of the page, anchored left; the composer
+   shares the same edge so the whole unit reads as one column. */
+.review>.conversation,.review>.conv-composer{width:100%;max-width:max(60%,720px)}
+.tour-invite{width:330px;padding:17px}
+.controls{display:flex;align-items:center;gap:10px}
+.canvas-zoom{display:flex;align-items:center;overflow:hidden;border:1px solid var(--line);border-radius:9px;background:var(--panel-soft)}
+.canvas-zoom button{width:40px;height:40px;padding:0;border:0;background:transparent;color:var(--muted);font-size:23px;line-height:1;cursor:pointer}
+.canvas-zoom button:hover:not(:disabled){background:var(--panel);color:var(--ink)}
+.canvas-zoom button:active:not(:disabled){transform:scale(.97);transition:transform 100ms ease-out}
+.canvas-zoom button:disabled{cursor:not-allowed;opacity:.35}
+.canvas-zoom output{min-width:52px;color:var(--muted);font:14px var(--mono);text-align:center}
+.tree-scroll:not(.outline-mode){cursor:grab;touch-action:none}
+.tree-scroll.dragging{cursor:grabbing;user-select:none}
+.tree-scroll>.map{transform:translate(var(--canvas-pan-x,0),var(--canvas-pan-y,0)) scale(var(--canvas-zoom));transform-origin:50% 0;will-change:transform}
+.tree-scroll>.outline,.tree-scroll>.extras{zoom:var(--canvas-zoom)}
+/* The inspector sits in its own column spanning canvas + conversation rows:
+   opening a tool narrows both, covering neither. */
+.workspace{grid-template-columns:minmax(0,1fr)}
+.app{grid-template-columns:minmax(0,1fr) auto}
+.app>.top{grid-area:1/1/2/3}
+.app>.workspace{grid-area:2/1}
+.app>.review{grid-area:3/1}
+.detail{grid-area:2/2/4/3;width:var(--detail-w);max-width:calc(100vw - 48px);margin:calc(12px/.85) calc(16px/.85) calc(12px/.85) 0;zoom:.85;/* margins live inside the zoom — divide by it so the card's edges line up with the unzoomed panels */min-width:0;opacity:1;transition:width .28s cubic-bezier(.32,.72,0,1),margin .28s cubic-bezier(.32,.72,0,1),opacity .18s ease-out}
+.detail-resizer{grid-area:2/2/4/3;position:relative;z-index:31;top:auto;bottom:auto;right:auto;justify-self:start;align-self:stretch;width:12px;margin:24px 0 24px -6px}
+.app.no-selection .detail{width:0;margin:12px 0;padding:0;border-width:0;opacity:0;pointer-events:none}
+.app.no-selection .detail-resizer{display:none}
+@keyframes detail-slide-in{from{transform:translateX(36px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes detail-fade-in{from{opacity:0}to{opacity:1}}
+.detail.entering{animation:detail-slide-in .24s cubic-bezier(.32,.72,0,1)}
+/* Both dialogs resize from the window frame (corner grip), not the textarea. */
+.rail-flyout{width:600px;min-width:360px;min-height:340px;max-width:92vw;max-height:88vh;resize:both;overflow:hidden}
+.rail-flyout[open]{display:flex;flex-direction:column}
+.rail-flyout textarea{flex:1;min-height:252px;resize:none}
+/* Slim 40px header: label · count, actions tucked right. */
+.conv-head{display:flex;align-items:center;gap:10px;min-height:40px}
+.chat-expand{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
+.chat-expand:hover{background:var(--panel);color:var(--blue)}
+.chat-expand svg{width:16px;height:16px;flex:none}
+/* Persistent composer pinned under the scrolling messages. */
+.conv-composer{display:flex;gap:8px;align-items:center}
+.conv-composer input{flex:1;height:42px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:16px;outline:none}
+.conv-composer input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #279cff15}
+.conv-composer input:disabled{opacity:.5}
+.conv-send{width:38px;height:38px;flex:none;border:1px solid #1e83d9;border-radius:50%;background:var(--blue);color:#fff;font-size:17px;line-height:1;cursor:pointer}
+.conv-send:hover:not(:disabled){filter:brightness(1.06)}
+.conv-send:disabled{opacity:.4;cursor:not-allowed}
+.chat-modal{width:760px;max-width:92vw;min-width:420px;min-height:220px;max-height:88vh;margin:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:0 24px 64px #1119;resize:both;overflow:hidden}
+.chat-modal[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px}
+.chat-modal::backdrop{background:#1c231e59;backdrop-filter:blur(1.5px)}
+.chat-modal header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chat-modal strong{font:650 20px var(--mono)}
+.chat-modal-body{min-height:0;display:grid}
+/* Generated-code window: same dialog idiom as the conversation window, sized for reading. */
+.code-modal{width:min(1200px,94vw);height:88vh;min-width:420px;min-height:280px;max-width:96vw;max-height:92vh;margin:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:0 24px 64px #1119;resize:both;overflow:hidden}
+.code-modal[open]{display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px}
+.code-modal::backdrop{background:#1c231e59;backdrop-filter:blur(1.5px)}
+.code-modal header{display:flex;align-items:center;gap:10px}
+.code-modal strong{font:650 18px var(--mono)}
+.code-modal .code-modal-lang{margin-left:auto;color:var(--muted);font:14px var(--mono)}
+.code-modal pre.codeview{min-height:0;border-radius:8px}
+.codehead-right{display:flex;align-items:center;gap:8px}
+.code-open{display:flex;align-items:center;justify-content:flex-start;gap:9px;width:100%;margin:0 0 9px;min-height:48px;padding:0 13px;font:650 16px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+#content>.field{margin-bottom:30px}/* description breathes before the section stack */
+/* One-shot attention beat when review opens: two hard rings with a lift, then quiet. */
+.code-open.pulse{animation:code-pulse 1s ease-out 2}
+@keyframes code-pulse{0%{box-shadow:0 0 0 0 #279cffcc;border-color:var(--blue);color:var(--blue);transform:scale(1)}35%{transform:scale(1.02);color:var(--blue)}100%{box-shadow:0 0 0 18px #279cff00;border-color:var(--line);color:var(--ink);transform:scale(1)}}
+.code-open svg{width:16px;height:16px;flex:none}
+.chat-composer{display:flex;gap:10px;align-items:flex-end}
+.chat-composer textarea{flex:1;min-height:52px;max-height:150px;resize:none;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-size:18px;line-height:1.45;outline:none}
+.chat-composer textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #279cff15}
+.chat-composer textarea:disabled{opacity:.5}
+/* ChatGPT-style thread: agent blocks span the full row; your bubble
+   right-aligns to the same edge, taking only the width it needs. */
+.msg{justify-self:start;max-width:min(72%,780px);padding:8px 12px;font-size:16px;line-height:1.6}
+.msg.claude{justify-self:stretch;max-width:none}
+.msg.you{justify-self:end;max-width:min(60%,680px);background:var(--green-bg);border-color:#a9cfb8}
+:root[data-theme="dark"] .msg.you{background:var(--green-bg);border-color:#2c4a37}
+.msg .who{display:flex;align-items:center;gap:7px;margin-bottom:1px;font-family:inherit;font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+.msg-pill{padding:2px 9px;border:1px solid var(--line);border-radius:99px;background:var(--panel-soft);color:var(--muted);font:12px var(--mono);line-height:1.5;cursor:pointer}
+/* Time + copy sit under the message and only surface on hover, so a scrolled-back
+   conversation stays text and not a wall of controls. Reserved height, never display:none —
+   revealing them must not reflow the message you are pointing at. Keyboard users get them
+   on :focus-within, which is the whole reason the row is a real button and not a ::after. */
+.msg-meta{display:flex;align-items:center;gap:8px;height:19px;margin-top:3px;opacity:0;transition:opacity .13s ease}
+.msg:hover .msg-meta,.msg:focus-within .msg-meta{opacity:1}
+.msg-time{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.msg-copy{display:inline-flex;align-items:center;gap:5px;padding:1px 6px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;transition:background .13s ease,color .13s ease}
+.msg-copy:hover{background:var(--panel-soft);color:var(--ink)}
+.msg-copy svg{width:13px;height:13px;flex:none}
+.msg-copy .tick{display:none}
+.msg-copy.copied{color:var(--green)}
+.msg-copy.copied .tick{display:block;animation:copy-pop .32s ease-out}
+.msg-copy.copied .sheets{display:none}
+@keyframes copy-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}
+.msg-pill:hover{border-color:#9ccdf5;background:var(--blue-bg);color:var(--blue)}
+.tool.hl{box-shadow:0 0 0 2px var(--blue),0 0 0 5px #279cff26}
+/* Verify chips: consistent metrics with the meta chips above them. */
+a.top-button{display:inline-flex;align-items:center;gap:3px;text-decoration:none}
+a.top-button svg{width:17px;height:17px;flex:none}
+.review.minimized .chat,.review.minimized .conv-composer,.review.minimized .review-resizer{display:none}
+.review{position:relative}
+.review-resizer{display:block;z-index:6;top:0;bottom:0;left:auto;right:0;width:12px;height:auto;cursor:col-resize}
+.review-resizer:after{top:50%;bottom:auto;left:5px;width:3px;height:46px;transform:translateY(-50%)}
+.app.conv-drag{transition:none}
+/* Tour invite: bottom-right so it never covers the zoom controls or inspector. */
+.tour-invite{position:fixed;top:auto;bottom:24px;right:24px}
+.tour-invite.show{animation:invite-in .32s cubic-bezier(.32,.72,0,1)}
+@keyframes invite-in{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* A check that just turned on pops once, riding the existing change flash. */
+@keyframes check-pop{0%{transform:scale(.3)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.flash .check.on{animation:check-pop .45s cubic-bezier(.34,1.56,.64,1)}
+.canvas-zoom output{cursor:pointer}
+.canvas-zoom output:hover{color:var(--ink)}
+/* Dark mode: the inspector needs its own elevation steps to keep hierarchy. */
+:root[data-theme="dark"] .disclosure{background:#1d2320;border-color:#333c36}
+:root[data-theme="dark"] .disclosure>summary:hover{background:#222925}
+:root[data-theme="dark"] .canvas-zoom,:root[data-theme="dark"] .chat-expand{background:var(--panel)}
+@media(prefers-reduced-motion:reduce){a.top-button.star-button,.top-button .star-glyph{transform:none!important;transition:none}.detail{transition:opacity .16s ease-out}.detail.entering{animation:detail-fade-in .16s ease-out}.tour-invite.show,.flash .check.on,.code-open.pulse,.agent-spinner,.tool-status.st-building,.msg.typing .dots i{animation:none}}
+/* The conversation is a left side panel: chat | canvas | inspector. */
+.app{grid-template-columns:var(--conv-w,380px) minmax(0,1fr) auto;grid-template-rows:minmax(96px,auto) minmax(0,1fr) 0}
+.app>.top{grid-area:1/1/2/4}
+.app>.review{grid-area:2/1/4/2;border-top:0;border-right:1px solid var(--line);padding:10px 12px 12px}
+.app>.workspace{grid-area:2/2}
+.detail{grid-area:2/3/4/4}
+.detail-resizer{grid-area:2/3/4/4}
+.review>.conversation,.review>.conv-composer{max-width:none}
+.msg{max-width:92%}
+.msg.claude{max-width:none}
+.conv-head #chatExpand{margin-left:auto}
+/* Collapsed side panel: a thin rail with the label turned vertical. */
+.app{transition:grid-template-columns .25s cubic-bezier(.32,.72,0,1)}
+.app.chat-min{grid-template-columns:46px minmax(0,1fr) auto;grid-template-rows:minmax(96px,auto) minmax(0,1fr) 0}
+.review.minimized{padding:10px 6px}
+.review.minimized .conv-head{flex-direction:column;gap:14px;min-height:0}
+.review.minimized #chatMinimize{order:-1}
+.review.minimized .conv-label{writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.12em}
+.review.minimized #chatExpand{display:none}
+#chatMinimize svg{transform:rotate(90deg)}
+/* The full-size header row fits at ~1320px and not below; 1360 leaves margin for the
+   theme label and star count varying in width. */
+@media(max-width:1360px){.top{gap:12px}.brand .dim{display:none}.phase-step{padding:6px;font-size:14px}}
+@media(max-width:1250px){.map{grid-template-columns:max-content minmax(240px,1fr);column-gap:32px;max-width:720px}.node.page{max-width:300px}}
+/* Below this even the compressed single row overlaps, so the header goes two-row: brand and
+   actions keep the top line, the phase rail drops to its own line underneath. */
+@media(max-width:1080px){.top{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}.phase-steps{grid-column:1/-1;grid-row:2;justify-content:flex-start}}
+/* Outline view: the map's scope tree as one nested-card document — the site,
+   then a global card and one card per page route. Same data attributes as the
+   map, so picks/selection/request all ride the existing delegation; only the
+   presentation differs. */
+.outline{display:none;position:relative;max-width:820px;margin:0 auto}
+.outline-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.outline-links path{stroke:#bcd9f0;stroke-width:1.5;fill:none;stroke-linecap:round}
+.tree-scroll.outline-mode .outline{display:block}
+.outline .node{display:inline-flex;margin-top:0}
+.outline .node.page{max-width:340px}
+.outline .node svg{width:16px;height:16px;flex:none}
+.outline .node .scope-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.outline .cond-mark{display:none}
+.outline .tool .cond-mark+.check{margin-left:auto}
+/* Tree rails are SVG (renderOutlineLinks), not CSS borders: two separate
+   border strokes (a container rail plus per-child elbows) rasterize at
+   different subpixels under canvas zoom and show doubled or detached lines.
+   One measured path draws the rail and every branch as a single stroke. */
+.outline-children{position:relative;margin:12px 0 0 18px;padding-left:26px;display:flex;flex-direction:column;gap:12px}
+.outline-card{border:1px solid var(--line);border-radius:13px;background:var(--panel-soft,#fafbfa);padding:14px 15px 15px}
+.outline-card-head{display:flex;align-items:center;gap:9px;min-height:24px}
+.outline-card-head svg{width:16px;height:16px;flex:none}
+.outline-card-title{font:700 15px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.outline-count{margin-left:auto;padding:3px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel);color:var(--muted);font:600 13px var(--mono);white-space:nowrap}
+.outline-card-sub{margin:4px 0 0;color:var(--muted);font-size:15px}
+.outline-list{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.outline-list .tool{min-height:50px}
+.tg-everywhere{border-color:#cfe4d5;background:var(--green-bg)}
+.tg-everywhere .outline-card-head{color:var(--green)}
+.tg-page{border-color:#b7d9f6;background:var(--blue-bg)}
+.tg-page .outline-card-head{color:var(--blue)}
+.tg-undeclared{border-style:dotted;border-color:#e2d3ab;background:var(--gold-bg)}
+.tg-undeclared .outline-card-head{color:var(--gold)}
+.outline-subhead{width:100%;padding:0;border:0;background:transparent;color:inherit;cursor:pointer;text-align:left}
+.outline-route{margin-left:auto;padding:2px 9px;border-radius:7px;background:#d9ecfb;font:600 13.5px var(--mono);white-space:nowrap}
+.outline-subhead .outline-count{margin-left:10px}
+.outline-chevron{color:var(--muted);font-size:16px;line-height:1;transition:transform .18s}
+.outline-card.open .outline-chevron{transform:rotate(90deg)}
+.tg-page .outline-list{display:none}
+.tg-page.open .outline-list{display:flex}
+.outline .tool-ghost{width:100%;margin-top:0;min-height:50px;border-radius:11px}
+.outline .plan-warning{margin-bottom:12px}
+:root[data-theme="dark"] .outline-links path{stroke:#2f4356}
+:root[data-theme="dark"] .tg-everywhere{border-color:#2c4a37}
+:root[data-theme="dark"] .tg-page{border-color:#20374d}
+:root[data-theme="dark"] .tg-undeclared{border-color:#584a26}
+:root[data-theme="dark"] .outline-route{background:#1c3247}
+</style>
+</head>
+
+<body>
+<main class="app">
+  <header class="top">
+    <div class="brand-stack"><div class="brand"><a class="logo" href="https://nekuda.ai" target="_blank" rel="noopener" aria-label="nekuda" title="nekuda.ai"><svg viewBox="22 13 239 213" aria-hidden="true"><rect x="22.625" y="13.7695" width="237.632" height="211.832" rx="105.916" fill="#fff"/><rect x="81.538" y="72.683" width="119.806" height="94.006" rx="47.003" fill="#00BFFF"/></svg></a><span>WebMCP Kit Explorer</span><span class="dim">/ Interactive plan</span></div></div>
+    <nav class="phase-steps" id="phaseSteps" aria-label="Current phase"><span class="phase-step" data-phase-step="propose">Plan</span><span class="phase-step" data-phase-step="build">Build</span><span class="phase-step" data-phase-step="review">Review</span><span class="phase-step" data-phase-step="verify">Verify</span><span class="phase-step" data-phase-step="done">Done</span></nav>
+    <div class="top-actions"><a class="top-button" href="https://docs.nekuda.ai" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>&nbsp;Docs</a><button class="top-button" id="tourButton" aria-label="Start quick tour">?&nbsp; Tour</button><button class="top-button" id="themeButton" aria-label="Switch color theme">◐&nbsp; <span id="themeLabel">Dark</span></button><a class="top-button star-button" href="https://github.com/nekuda-ai/webmcp-kit" target="_blank" rel="noopener" title="Star WebMCP Kit on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>&nbsp;Star<svg class="star-glyph" viewBox="0 -0.711 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg></a><aside class="tour-invite" id="tourInvite"><strong>New here?</strong><p>See how to review the interactive plan, steer the agent, and approve the tools it builds.</p><div class="tour-invite-actions"><button class="small" id="dismissTour">Not now</button><button class="small primary" id="startTour">Start tour</button></div></aside></div>
+  </header>
+  <section class="workspace">
+    <section class="panel tree-panel">
+      <header class="panel-head">
+        <span class="eyebrow">Tool suggestions</span>
+        <div class="controls">
+          <div class="seg"><button class="active" data-view="map">⌘ Map</button><button data-view="outline">☷ Outline</button></div><div class="canvas-zoom" aria-label="Canvas zoom"><button id="zoomOut" type="button" aria-label="Decrease canvas size">−</button><output id="zoomValue" title="Reset zoom and position">75%</output><button id="zoomIn" type="button" aria-label="Increase canvas size">+</button></div>
+        </div>
+      </header>
+      <div class="tree-scroll" id="treeScroll">
+        <div class="map"><svg class="map-links" id="mapLinks" aria-hidden="true"></svg><div class="node page" id="journeyNode"><i class="dot dot-live"></i><span id="journeyLabel">…</span><span class="page-count" id="pageCount">0</span></div><div class="tools" id="tools"></div></div>
+        <div class="outline" id="outline"></div>
+        <div class="extras" id="extras"></div>
+      </div>
+      <div class="side-rail" hidden><button class="rail-button" id="railRequest" type="button" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 14 5v6L8 14.2 2 11V5z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/><path d="M2 5l6 3.2L14 5M8 8.2v6" fill="none" stroke="currentColor" stroke-width="1.15"/></svg><span>Request tool</span></button></div>
+      <div class="status-bar"><span id="statusBox" role="status" aria-live="polite">Waiting for the agent to write the plan…</span><button class="small stage-open" id="stageButton" type="button" hidden></button><button class="small status-note" id="railNote" type="button"><span>Add note</span></button><button class="submit" id="primaryAction"><span id="primaryLabel">Submit</span></button></div>
+      <dialog class="rail-flyout" id="railFlyout"><header><strong id="railFlyoutTitle">Add note</strong><button class="rail-flyout-close" id="railFlyoutClose" aria-label="Close">×</button></header><textarea id="railFlyoutInput" maxlength="500"></textarea><footer><span class="rail-count" id="railFlyoutCount">0/500</span><button class="small primary" id="railFlyoutAction" type="button">Save</button></footer></dialog>
+    </section>
+    <dialog class="agent-stage" id="agentStage" aria-live="polite">
+      <article class="agent-card">
+        <header class="agent-card-head"><h2 id="agentStageTitle">Building your tools</h2><button class="agent-close" id="closeAgentStage" aria-label="Close progress">×</button></header>
+        <div class="agent-card-body">
+          <section class="stage-progress">
+            <div class="stage-progress-head"><strong id="stageCount"></strong><span class="stage-eta" id="stageEta"></span></div>
+            <progress class="stage-bar" id="stageBar" max="1" value="0"></progress>
+          </section>
+          <section class="agent-processing"><div class="build-list" id="buildList"></div></section>
+          <aside class="stage-hint"><span class="stage-hint-badge" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="12.6" r="12.4" fill="currentColor" stroke="none" opacity=".06"/><circle cx="16" cy="12.6" r="8.4" fill="currentColor" stroke="none" opacity=".08"/><path d="M16 4.5A7.5 7.5 0 0 0 11.6 18a2.6 2.6 0 0 1 1.1 2.1v.4h6.6v-.4a2.6 2.6 0 0 1 1.1-2.1A7.5 7.5 0 0 0 16 4.5Z" fill="currentColor" fill-opacity=".14"/><path d="M12.7 23.6h6.6M14.2 26.6h3.6"/><path d="M16 11.4v6.4"/><path d="M16 1.6v1.5M25.2 6.8l-1 1.1M28.4 16h-1.5M3.6 16H5.1M6.8 6.8l1 1.1" opacity=".55"/></svg></span><div><strong>You can close this window.</strong><p>The agent keeps building in the terminal. Reopen it from “Build status” in the bar at the bottom — nothing is lost.</p></div></aside>
+        </div>
+        <footer class="agent-card-foot"><button class="small danger" id="cancelBuild">Stop the build</button></footer>
+      </article>
+    </dialog>
+    <dialog class="agent-stage" id="connectStage" aria-live="polite">
+      <article class="agent-card connect-card">
+        <button class="agent-close connect-close" id="connectClose" type="button" aria-label="Close" hidden>×</button>
+        <div class="connect-card-body">
+          <h2 id="connectTitle">Connect WebMCP Kit to AgentLane</h2>
+          <p class="connect-copy" id="connectCopy">See registered tools and their activity in AgentLane. Your built tools stay in this project.</p>
+          <div class="connect-actions" id="connectActions"><button class="small" id="skipConnect" type="button">Skip for now</button><button class="small primary" id="startConnect" type="button">Connect to AgentLane</button></div>
+        </div>
+      </article>
+    </dialog>
+    <dialog class="confirm" id="cancelConfirm">
+      <div class="confirm-card">
+        <strong>Stop the build?</strong>
+        <p id="cancelConfirmBody"></p>
+        <div class="confirm-actions"><button class="small" data-cancel-build="keep">Keep building</button><button class="small danger" data-cancel-build="stop">Stop the build</button></div>
+      </div>
+    </dialog>
+  </section>
+  <button class="detail-resizer" id="detailResizer" role="separator" aria-orientation="vertical" aria-label="Resize the suggestion panel" tabindex="0"></button>
+  <section class="panel detail">
+    <header class="detail-head">
+      <div class="detail-head-top"><h1 id="title"></h1><span class="flash-tag" id="changeTag" hidden>updated</span><button class="detail-close" id="detailClose" aria-label="Close details">×</button></div>
+    </header>
+    <div class="detail-body">
+      <div class="content" id="content"></div>
+    </div>
+  </section>
+  <footer class="review">
+    <button class="review-resizer" id="reviewResizer" aria-label="Resize the review area"></button>
+    <div class="conversation"><div class="conv-head"><span class="conv-label">Conversation</span><button class="chat-expand" id="chatExpand" type="button" title="Open conversation window" aria-label="Open conversation window"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button><button class="chat-expand" id="chatMinimize" type="button" title="Minimize conversation" aria-label="Minimize conversation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button></div><div class="chat" id="chat"></div></div>
+    <div class="conv-composer"><input id="convInput" maxlength="500" placeholder="Ask for changes or leave feedback…" aria-label="Message the agent"><button class="conv-send" id="convSend" type="button" aria-label="Send">↑</button></div>
+  </footer>
+</main>
+<dialog class="chat-modal" id="chatModal"><header><strong>Conversation</strong><button class="rail-flyout-close" id="chatModalClose" aria-label="Close">×</button></header><div class="chat-modal-body" id="chatModalBody"></div><footer class="chat-composer"><textarea id="chatModalInput" maxlength="500" placeholder="Message the agent…" aria-label="Message the agent"></textarea><button class="small primary" id="chatModalSend" type="button">Send</button></footer></dialog>
+<dialog class="code-modal" id="codeModal"><header><strong id="codeModalFile"></strong><span class="code-modal-lang" id="codeModalLang"></span><button class="rail-flyout-close" id="codeModalClose" aria-label="Close">×</button></header><div class="chat-modal-body" id="codeModalBody"></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js" integrity="sha384-ZD4UAn12lO2plEJ4lonOHO0fRSCgq0VAuoDx6/rglijDjzDYIXgCexIVu3PFJpJf" crossorigin="anonymous"></script>
+<script>
+(function(){
+"use strict";
+
+/* ── Untrusted input ──────────────────────────────────────────────────────────
+   Everything in the state folder is attacker-influenceable: a page the agent
+   browses can plant text that lands in plan.json or a chat reply. So:
+   - every value reaches the DOM through html`` (auto-escapes) or textContent;
+   - recognized enum values map to FIXED class names, unknown ones get a fixed
+     fallback class and are shown as escaped text;
+   - the only raw-HTML producers are codeHtml() and mdHtml(), which escape each
+     slice themselves and emit a fixed, closed set of tags;
+   Html instances are the sole raw marker, and JSON.parse cannot forge one. */
+function Html(h){this.h=h}
+var ESCAPES={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};
+function safeStr(v){
+  if(typeof v==="string")return v;
+  if(v==null)return"";
+  if(typeof v==="number"||typeof v==="boolean")return String(v);
+  try{var s=String(v);return typeof s==="string"?s:""}catch(e){return""}
+}
+function esc(v){return safeStr(v).replace(/[&<>"']/g,function(c){return ESCAPES[c]})}
+function frag(v){
+  if(v==null||v===false||v===true)return"";
+  if(v instanceof Html)return v.h;
+  if(Array.isArray(v)){for(var i=0,out="";i<v.length;i++)out+=frag(v[i]);return out}
+  return esc(v);
+}
+function html(parts){
+  var out=parts[0];
+  for(var i=1;i<arguments.length;i++)out+=frag(arguments[i])+parts[i];
+  return new Html(out);
+}
+function setHtml(node,value){node.innerHTML=frag(value)}
+function jsonish(v){try{return safeStr(JSON.stringify(v))}catch(e){return""}}
+function canonicalJson(v){
+  if(v===null||typeof v!=="object")return JSON.stringify(v);
+  if(Array.isArray(v))return"["+v.map(canonicalJson).join(",")+"]";
+  return"{"+Object.keys(v).sort().map(function(k){return JSON.stringify(k)+":"+canonicalJson(v[k])}).join(",")+"}";
+}
+
+/* Recognized values → fixed class names. Anything else gets a fixed fallback. */
+var STATUS_CLASS={proposed:"st-proposed",building:"st-building",review:"st-review",approved:"st-approved",declined:"st-declined"};
+var KNOWN_STATUS={proposed:1,building:1,review:1,approved:1,declined:1};
+function statusClass(v){return Object.prototype.hasOwnProperty.call(STATUS_CLASS,v)?STATUS_CLASS[v]:"st-unknown"}
+function known(v){return Object.prototype.hasOwnProperty.call(KNOWN_STATUS,v)}
+
+/* ── Live wire ────────────────────────────────────────────────────────────────
+   The server serves this page and binds port 0, so the socket is always derived
+   from location.host. A connection starts with the whole state folder; later file
+   messages merge into that model. The page keeps no durable state of its own. */
+var PAGE_QUERY=new URLSearchParams(location.search);
+var CAPABILITY=PAGE_QUERY.get("capability")||"",RUN_ID=PAGE_QUERY.get("run_id")||"";
+var files={},socket=null,finished=false,pending=null,queued=false,snapshotSeq=0;
+var model=null,requests=new Map(),requestSeq=0,RECONCILE_GRACE_MS=800;
+
+function fileSet(source){
+  var out=Object.create(null);
+  if(!source||typeof source!=="object"||Array.isArray(source))return out;
+  Object.keys(source).forEach(function(name){if(typeof source[name]==="string")out[name]=source[name]});
+  return out;
+}
+function queueFiles(next){
+  pending=next;
+  if(queued)return;
+  queued=true;
+  // setTimeout, not requestAnimationFrame: rAF is suspended while the window is
+  // hidden or occluded (macOS occlusion counts), which left updates queued until
+  // the user looked at the window. 16ms still coalesces write bursts.
+  setTimeout(function(){queued=false;files=pending;pending=null;onFiles()},16);
+}
+
+function socketUrl(role){
+  var q=new URLSearchParams();q.set("role",role);q.set("capability",CAPABILITY);q.set("run_id",RUN_ID);
+  return(location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws?"+q.toString();
+}
+function newRequestId(){
+  requestSeq++;try{return crypto.randomUUID()}catch(e){return Date.now().toString(36)+"-"+requestSeq.toString(36)}
+}
+function latestRequest(){
+  var out=null;requests.forEach(function(r){if(!out||r.created>out.created)out=r});return out;
+}
+function failRequest(msg){
+  var id=safeStr(msg&&msg.request_id),r=id&&requests.get(id);
+  if(!r){r=latestRequest();if(!r||r.state!=="saving")r=null}
+  if(r){r.state="error";if(r.onError)r.onError()}
+  var reason=safeStr(msg&&msg.message);toast(reason?reason+" Try again.":"Couldn’t save that action — try again");
+  if(model)render();
+}
+function confirmRequest(r,event){
+  if(r.state==="recorded"||r.state==="handled")return;
+  clearTimeout(r.reconcileTimer);r.reconcileTimer=null;
+  r.state="recorded";r.eventId=safeStr(event.event_id);r.order=Number(event.order);
+  var done=r.onRecorded;r.onRecorded=null;r.onError=null;if(done)done(r);
+  if(r.type==="pick")requests.delete(r.requestId);
+  if(model)render();
+}
+function recordedRequest(msg){
+  var id=safeStr(msg.request_id),r=requests.get(id);
+  if(!r||safeStr(msg.run_id)!==RUN_ID)return;
+  confirmRequest(r,msg);
+}
+function connect(){
+  if(finished)return;
+  try{socket=new WebSocket(socketUrl("page"))}catch(e){return}
+  socket.onopen=function(){ui.connDown=false;if(model)renderReview()};
+  socket.onmessage=function(e){
+    var msg;try{msg=JSON.parse(e.data)}catch(err){return}
+    if(!msg)return;
+    if(msg.type==="recorded"){recordedRequest(msg);return}
+    if(msg.type==="error"){failRequest(msg);return}
+    if(msg.type==="snapshot"){snapshotSeq++;queueFiles(fileSet(msg.files));return}
+    if(msg.type!=="file"||typeof msg.name!=="string"||(msg.text!==null&&typeof msg.text!=="string"))return;
+    // Rebuild storms (an agent writing several files at once) collapse to the latest.
+    var next=fileSet(pending||files);
+    if(msg.text===null)delete next[msg.name];else next[msg.name]=msg.text;
+    queueFiles(next);
+  };
+  socket.onclose=function(){
+    // A send without `recorded` is uncertain, not failed: it may have reached the
+    // durable append just before the connection went away. Inputs stay intact.
+    requests.forEach(function(r){if(r.state==="saving"){r.state="uncertain";r.reconcileAfter=snapshotSeq}});
+    // Done ends the run: the server flushes the final file update and exits. Do not
+    // reconnect forever against a server that is meant to be gone.
+    if(finished||(model&&model.phase==="done")){finished=true;return}
+    ui.connDown=true;if(model)renderReview();
+    setTimeout(connect,1000);
+  };
+  socket.onerror=function(){try{socket.close()}catch(e){}};
+}
+function send(type,payload,onRecorded,onError){
+  if(!socket||socket.readyState!==1){if(onError)onError();toast("Not connected — nothing was sent");return false}
+  if(type==="submit"||type==="approve"||type==="connect")requests.forEach(function(r,id){
+    if(r.type===type&&r.state==="retryable")requests.delete(id);
+  });
+  var requestId=newRequestId(),r={requestId:requestId,type:type,payload:payload,payloadKey:canonicalJson(payload),state:"saving",created:requestSeq,
+    createdAt:Date.now(),afterOrder:model?model.lastOrder:-1,onRecorded:onRecorded,onError:onError};
+  requests.set(requestId,r);if(model)renderReview();
+  try{socket.send(JSON.stringify({request_id:requestId,type:type,payload:payload}));return requestId}
+  catch(e){requests.delete(requestId);if(onError)onError();toast("Couldn’t save that action — try again");return false}
+}
+
+/* A submit is durable, so do not read it out of memory alone: the server records the
+   event and normalize() reads it back, which is what keeps the button disabled across a
+   reload during the tens of seconds before the agent appends phase `build`. */
+function submittedNow(){return ui.submitted||!!(model&&model.submitted)}
+
+/* ── Ephemeral UI state ───────────────────────────────────────────────────────
+   Maps, not objects: suggestion ids come off disk and "__proto__" must be a key
+   like any other. Nothing here survives a reload except the tour flag and theme. */
+var ui={activeId:null,picks:new Map(),notes:new Map(),open:new Map(),expandedFiles:new Set(),general:"",toolRequest:"",railMode:null,connDown:false,submitted:false,submitting:false,chatLocal:[],awaitingReply:false,claudeSeen:0,chatCount:0,revealTs:null,revealReady:false,
+        view:"map",outlineClosed:new Set(),chatExpanded:false,chatMinimized:false,stageClosed:false,approved:false,approving:false,canvasZoom:.75,panX:0,panY:0,
+        connectAction:"",connectSaving:false,connectClosed:false,reviewHeight:250,inspectorWidth:500};
+var flashUntil=new Map(),flashTimer=null,prevSig=null,prevPhase=null;
+var prevConnectState="";
+
+function $(s){return document.querySelector(s)}
+function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
+
+/* ── One normalization pass per update ────────────────────────────────────────
+   Every render helper reads this model; nothing re-parses the state folder. */
+var KNOWN_FIELDS={id:1,name:1,description:1,why:1,status:1,params:1,availability:1};
+var CHAT_WINDOW=100,PREVIEW=2000;
+
+function ndjson(name){
+  var lines=safeStr(files[name]).split("\n"),out=[];
+  for(var i=0;i<lines.length;i++){
+    if(!lines[i])continue;
+    try{var v=JSON.parse(lines[i]);if(v&&typeof v==="object"&&!Array.isArray(v))out.push(v)}catch(e){}
+  }
+  return out;
+}
+/* New feedback lines are capability-run journal envelopes. Flatten only their payload
+   for the existing renderers, retain the envelope identity, and order same-run bursts by
+   the server's monotonic `order`. Old worktrees can still be opened: legacy lines pass
+   through unchanged and keep file order. */
+function normalizeJournalEvent(entry,line){
+  var eventId=safeStr(entry&&entry.event_id),runId=safeStr(entry&&entry.run_id);
+  if(!eventId||!runId)return Object.assign({_line:line,_legacy:true},entry);
+  if(RUN_ID&&runId!==RUN_ID)return null;
+  var payload=entry.payload&&typeof entry.payload==="object"&&!Array.isArray(entry.payload)?entry.payload:{};
+  return Object.assign({_line:line,_legacy:false},payload,{
+    event_id:eventId,run_id:runId,order:Number(entry.order),type:safeStr(entry.type),ts:safeStr(entry.ts),_payload:payload
+  });
+}
+function journalEvents(name){
+  var events=ndjson(name).map(normalizeJournalEvent).filter(Boolean);
+  var legacy=events.filter(function(e){return e._legacy}).sort(function(a,b){return a._line-b._line});
+  var current=events.filter(function(e){return !e._legacy}).sort(function(a,b){return a.order-b.order||a._line-b._line});
+  return legacy.concat(current);
+}
+function foldDelivery(events){
+  var byEvent=new Map(),runWindow=null,valid={waiting:1,claimed:1,timeout:1,conflict:1,error:1};
+  events.forEach(function(e){
+    var eventId=safeStr(e.event_id),runId=safeStr(e.run_id),state=safeStr(e.status||e.state);
+    if((RUN_ID&&runId!==RUN_ID)||!valid[state])return;
+    if(eventId){byEvent.set(eventId,state);return}
+    var lastOrder=Number(e.last_order);
+    if((state==="waiting"||state==="timeout")&&e.queue_depth===0&&Number.isSafeInteger(lastOrder)&&lastOrder>=0){
+      runWindow={state:state,lastOrder:lastOrder};
+    }else if((state==="error"||state==="conflict")&&runWindow){
+      runWindow={state:state,lastOrder:runWindow.lastOrder};
+    }
+  });
+  return{byEvent:byEvent,runWindow:runWindow};
+}
+function deliveryState(event){
+  if(!event)return "";
+  var direct=model.delivery.byEvent.get(safeStr(event.event_id));
+  if(direct)return direct;
+  var window=model.delivery.runWindow,order=Number(event.order);
+  return window&&Number.isSafeInteger(order)&&order>window.lastOrder?window.state:"";
+}
+function handledEvents(events){
+  var out=new Set();events.forEach(function(e){
+    if(safeStr(e.status)==="handled"&&safeStr(e.event_id)&&(!RUN_ID||safeStr(e.run_id)===RUN_ID))out.add(safeStr(e.event_id));
+  });return out;
+}
+function pairs(obj,skip){
+  var out=[];
+  Object.keys(obj).forEach(function(k){
+    if(skip&&Object.prototype.hasOwnProperty.call(skip,k))return;
+    var v=obj[k];
+    var text=(v&&typeof v==="object")?jsonish(v):safeStr(v);
+    if(text!=="")out.push({key:k,value:text});
+  });
+  return out;
+}
+/* Folds _status.ndjson into {phase, steps, runSteps} — latest state per (suggestion, step).
+   `ts` is kept, not dropped: a step's own start timestamp is the only measure of how long a
+   tool takes. `startTs` survives the `done` line overwriting the `start` one, so a finished
+   step still knows when it began.
+   Entering phase `verify` clears every suggestion's stored verify step: the build-phase
+   verify chips were the static checks, and the runtime ladder that starts now must not open
+   the card wearing their outcomes — a stale ✓ on a tool the ladder has not reached is a lie.
+   Code steps survive; only the verdicts reset. */
+function foldStatus(events){
+  var phase="",steps=new Map(),runSteps=new Map();
+  events.forEach(function(e){
+    var ts=safeStr(e.ts),ph=safeStr(e.phase);
+    if(ph){
+      if(ph==="verify"&&phase!=="verify")steps.forEach(function(m){m.delete("verify")});
+      phase=ph;return;
+    }
+    var run=safeStr(e.run||e.run_step);
+    if(run){runSteps.set(run,{state:safeStr(e.state)||"start"});return}
+    var id=safeStr(e.suggestion),step=safeStr(e.step);
+    if(!id||!step)return;
+    var state=safeStr(e.state)||"start",outcome=safeStr(e.outcome);
+    if(!steps.has(id))steps.set(id,new Map());
+    var prev=steps.get(id).get(step);
+    steps.get(id).set(step,{state:state,outcome:outcome,ts:ts,
+      startTs:(prev&&prev.startTs)||(state==="start"?ts:"")});
+  });
+  return{phase:phase,steps:steps,runSteps:runSteps};
+}
+/* Availability is where a tool registers: site-wide or on specific pages —
+   those are the only two scopes. A registration condition ("cart has items")
+   is a property of the tool, not a place, and rides along as `when`. A missing
+   or malformed declaration normalizes to null and the map files the tool under
+   "Scope not declared" — never a silent "site-wide", because an undeclared
+   scope is a question, not a default. */
+var SCOPE_KINDS={everywhere:1,page:1};
+function normAvailability(v){
+  if(!v||typeof v!=="object"||Array.isArray(v))return null;
+  var scope=safeStr(v.scope);
+  if(!Object.prototype.hasOwnProperty.call(SCOPE_KINDS,scope))return null;
+  var where=safeStr(v.where).trim();
+  if(scope==="page"&&!where)return null;
+  return{scope:scope,where:scope==="everywhere"?"":where,
+         when:safeStr(v.when).trim(),note:safeStr(v.note).trim()};
+}
+function normalize(){
+  var plan={};
+  try{var p=JSON.parse(files["plan.json"]);if(p&&typeof p==="object"&&!Array.isArray(p))plan=p}catch(e){}
+
+  var raw=Array.isArray(plan.suggestions)?plan.suggestions:[];
+  var suggestions=[],byId=new Map();
+  raw.forEach(function(s,i){
+    if(!s||typeof s!=="object"||Array.isArray(s))return;
+    var id=safeStr(s.id)||safeStr(s.name)||"suggestion-"+(i+1);
+    var duplicate=byId.has(id); // never invent an id the agent cannot associate
+    var status=safeStr(s.status)||"proposed";
+    var entry={
+      id:id,name:safeStr(s.name)||id,description:safeStr(s.description),why:safeStr(s.why),
+      status:status,statusKnown:known(status),
+      availability:normAvailability(s.availability),
+      params:(Array.isArray(s.params)?s.params:[]).filter(function(x){return x&&typeof x==="object"&&!Array.isArray(x)})
+        .map(function(x){return{name:safeStr(x.name),type:safeStr(x.type),description:safeStr(x.description)}}),
+      extras:pairs(s,KNOWN_FIELDS),duplicate:duplicate
+    };
+    suggestions.push(entry);
+    if(!duplicate)byId.set(id,entry);
+  });
+  // Only canonical entries are actionable: counts, picks and submit ignore duplicates.
+  var canonical=suggestions.filter(function(s){return !s.duplicate});
+
+  // Status: phases, per-suggestion build steps and run-level finish steps (docs, pr)
+  // live in the same file; foldStatus owns the folding (and the verify-phase reset).
+  var folded=foldStatus(ndjson("_status.ndjson"));
+  var phase=folded.phase,steps=folded.steps,runSteps=folded.runSteps;
+  if(!phase)phase=suggestions.length?"propose":"boot";
+
+  // Conversation: the agent's replies plus our own durably recorded events.
+  var feedback=journalEvents("_feedback.ndjson"),chat=[];
+  feedback.forEach(function(e){
+    if(e.type!=="comment"&&e.type!=="feedback")return;
+    var text=safeStr(e.text);
+    if(text)chat.push({ts:safeStr(e.ts),order:e._legacy?null:e.order,who:"you",re:safeStr(e.suggestion),text:text});
+  });
+  ndjson("_chat.ndjson").forEach(function(e){
+    var text=safeStr(e.text);
+    if(text)chat.push({ts:safeStr(e.ts),who:"claude",re:safeStr(e.re),text:text});
+  });
+  chat.sort(function(a,b){
+    if(Number.isFinite(a.order)&&Number.isFinite(b.order))return a.order-b.order;
+    return a.ts<b.ts?-1:a.ts>b.ts?1:0;
+  });
+
+  // Picks are the server's record; the page only overlays what it just sent.
+  // The submit itself is recorded here too (the server writes down every event), and
+  // reading it back is what makes a submit survive a reload: the agent takes tens of
+  // seconds to notice one and append phase `build`, and for that whole gap a reopened
+  // page used to show an enabled Submit button and accept a second one.
+  var recorded=new Map(),submitted="",approval=null,connectDecision=null,lastOrder=-1;
+  feedback.forEach(function(e){
+    if(!e._legacy&&Number.isSafeInteger(e.order))lastOrder=Math.max(lastOrder,e.order);
+    if(e.type==="submit"){submitted=safeStr(e.ts)||submitted;return}
+    if(e.type==="approve"&&!e._legacy){approval=e;return}
+    if(e.type==="connect"&&!e._legacy){connectDecision=e;return}
+    if(e.type!=="pick")return;
+    var id=safeStr(e.suggestion);
+    if(id)recorded.set(id,e.picked!==false);
+  });
+
+  // Code lives at <id>.code.md — one canonical name, no fallback.
+  var code=new Map(),claimed={};
+  suggestions.forEach(function(s){
+    var name=s.id+".code.md";
+    claimed[name]=1;
+    var text=safeStr(files[name]);
+    if(!text.trim())return;
+    var fence=text.match(/```([\w.+-]*)[^\S\n]*\r?\n([\s\S]*?)```/);
+    code.set(s.id,{file:name,lang:(fence&&fence[1])||"code",text:(fence?fence[2]:text).replace(/\s+$/,"")});
+  });
+
+  // Anything else the agent left in the folder is shown, not hidden.
+  var delivery=foldDelivery(ndjson("_delivery.ndjson")),handled=handledEvents(ndjson("_ack.ndjson"));
+  var actionable={comment:1,submit:1,feedback:1,approve:1,cancel:1,connect:1},latestUnacked=null;
+  feedback.forEach(function(e){if(actionable[e.type]&&safeStr(e.event_id)&&!handled.has(safeStr(e.event_id)))latestUnacked=e});
+
+  var owned={"plan.json":1,"_status.ndjson":1,"_chat.ndjson":1,"_feedback.ndjson":1,"_delivery.ndjson":1,"_ack.ndjson":1};
+  var extraFiles=Object.keys(files).filter(function(n){
+    return !Object.prototype.hasOwnProperty.call(owned,n)&&!Object.prototype.hasOwnProperty.call(claimed,n);
+  }).sort().map(function(n){return{name:n,text:safeStr(files[n])}});
+
+  return{journey:safeStr(plan.journey),site:safeStr(plan.site),suggestions:suggestions,canonical:canonical,byId:byId,phase:phase,steps:steps,runSteps:runSteps,
+         chat:chat,recorded:recorded,code:code,extraFiles:extraFiles,submitted:submitted,
+         approval:approval,connectDecision:connectDecision,lastOrder:lastOrder,feedback:feedback,delivery:delivery,handled:handled,latestUnacked:latestUnacked,
+         planExtras:pairs(plan,{journey:1,site:1,suggestions:1})};
+}
+
+/* ── Ephemeral change highlight (replaces the mockup's version/diff subsystem) ──
+   Flash whatever moved between two consecutive updates, then forget it. Only
+   suggestions count: a comment echoing back is not a change to the plan. */
+function signature(){
+  var sig=new Map();
+  model.canonical.forEach(function(s){
+    var c=model.code.get(s.id);
+    sig.set(s.id,jsonish([s.name,s.description,s.why,s.status,s.availability,s.params,s.extras,c&&c.text]));
+  });
+  return sig;
+}
+function markChanges(){
+  var next=signature();
+  if(prevSig){
+    var until=Date.now()+2400;
+    next.forEach(function(v,id){if(prevSig.get(id)!==v)flashUntil.set(id,until)});
+  }
+  prevSig=next;
+  clearTimeout(flashTimer);
+  if(flashUntil.size)flashTimer=setTimeout(function(){flashUntil.clear();render()},2500);
+}
+function flashing(id){var u=flashUntil.get(id);return u!==undefined&&u>Date.now()}
+
+/* ── Picks ────────────────────────────────────────────────────────────────────
+   _feedback.ndjson is the record. The overlay is installed only after the server's
+   `recorded` response proves the append and is dropped when the snapshot agrees. */
+function syncPicks(){
+  ui.picks.forEach(function(o,id){
+    if(model.recorded.get(id)===o.on)ui.picks.delete(id);
+  });
+}
+function picked(id){
+  var o=ui.picks.get(id);
+  if(o)return o.on;
+  if(model.recorded.has(id))return model.recorded.get(id);
+  var s=model.byId.get(id); // no pick on record: a declined suggestion reads as unpicked
+  return !(s&&s.status==="declined");
+}
+function pickedIds(){return model.canonical.filter(function(s){return picked(s.id)}).map(function(s){return s.id})}
+function setPick(id,on){
+  send("pick",{suggestion:id,picked:on},function(){ui.picks.set(id,{on:on});render()});
+}
+function active(){
+  // No fallback to the first suggestion: the page opens with nothing selected
+  // and the map at full width; details appear when a tool is clicked.
+  return ui.activeId?model.byId.get(ui.activeId)||null:null;
+}
+function note(id){return safeStr(ui.notes.get(id))}
+function logLocal(re,text,key){
+  var ts=new Date().toISOString().slice(0,19)+"Z",hit=key&&ui.chatLocal.find(function(m){return m.key===key});
+  if(hit){hit.text=text;hit.ts=ts}else ui.chatLocal.push({key:key||null,ts:ts,who:"you",re:re,text:text});
+  renderChat();
+}
+function claudeCount(){return model?model.chat.filter(function(m){return m.who==="claude"}).length:0}
+function expectReply(){ui.awaitingReply=true;ui.claudeSeen=claudeCount();renderChat()}
+
+/* ── Scope grouping ───────────────────────────────────────────────────────────
+   Site-wide and page-specific tools must not read as one flat list: where a
+   tool registers is part of the contract under review. The map's third column is
+   a stack of scope groups — [scope node | its tools] — so page → scope → tool
+   reads as a tree. Groups keep plan order within a kind; kinds order site-wide →
+   page → undeclared. A registration condition never forms a group of its own —
+   it renders as a marker on the tool. */
+var SCOPE_ORDER={everywhere:0,page:1,undeclared:2};
+var SCOPE_GLYPHS={
+  everywhere:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13.5 13.5 0 0 1 0 18M12 3a13.5 13.5 0 0 0 0 18"/></svg>',
+  page:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/></svg>',
+  undeclared:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.4 2.4 0 1 1 3.3 2.2c-.7.3-.9.9-.9 1.6"/><path d="M12 16.6h.01"/></svg>'
+};
+var COND_GLYPH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.6 20.4 12 12 20.4 3.6 12z"/></svg>';
+function scopeGroupTitle(g){
+  if(g.kind==="everywhere")return"These tools register on every page of the site.";
+  if(g.kind==="page")return"These tools register only on "+g.label+" and act on what it shows.";
+  return"The plan does not say where these tools register — ask the agent to declare it.";
+}
+function scopeKind(s){return s.availability?s.availability.scope:"undeclared"}
+function scopeLabel(s){
+  var a=s.availability;
+  return a?(a.scope==="everywhere"?"Site-wide":a.where):"Scope not declared";
+}
+function scopeGlyph(kind){return new Html(SCOPE_GLYPHS[kind]||SCOPE_GLYPHS.undeclared)}
+function scopeGroups(list){
+  var groups=[],byKey=new Map();
+  list.forEach(function(s){
+    var kind=scopeKind(s),label=scopeLabel(s),key=kind+"\n"+label;
+    var g=byKey.get(key);
+    if(!g){g={kind:kind,label:label,tools:[]};byKey.set(key,g);groups.push(g)}
+    g.tools.push(s);
+  });
+  return groups.sort(function(a,b){return SCOPE_ORDER[a.kind]-SCOPE_ORDER[b.kind]});
+}
+function condTitle(s){
+  var a=s.availability;
+  return a&&a.when?"Only while "+a.when+(a.note?" — "+a.note:""):"";
+}
+function condMark(s){
+  var t=condTitle(s);
+  return t?html`<i class="cond-mark" title="${t}">${new Html(COND_GLYPH)}</i>`:"";
+}
+function scopeTitle(s){
+  var a=s.availability;
+  if(!a)return"The plan does not say where this tool registers.";
+  var head=a.scope==="everywhere"?"Registers on every page":"Registers only on "+a.where;
+  if(a.when)head+=", only while "+a.when;
+  return a.note?head+" — "+a.note:head;
+}
+function scopeChip(s){
+  var kind=scopeKind(s);
+  return html`<span class="scope-chips"><span class="scope-chip sc-${kind}" title="${scopeTitle(s)}">${scopeGlyph(kind)}${scopeLabel(s)}</span>${
+    s.availability&&s.availability.when?html`<span class="scope-chip sc-cond" title="${condTitle(s)}">${new Html(COND_GLYPH)}${"while "+s.availability.when}</span>`:""}</span>`;
+}
+function scopeDetail(s){
+  var a=s.availability;
+  if(!a)return"The plan does not declare where this tool registers — ask the agent to add it.";
+  var out=a.scope==="everywhere"?"Registers on every page of the site.":
+          "Registers only there; agents on other pages will not see it.";
+  if(a.when)out+=" Only while "+a.when+".";
+  if(a.note)out+=" "+a.note.replace(/\.?$/,".");
+  return out;
+}
+
+/* ── Rendering ───────────────────────────────────────────────────────────────── */
+function checkBox(s){
+  var on=picked(s.id);
+  return html`<button class="check ${on?"on":""}" data-toggle="${s.id}" aria-label="${(on?"Unpick ":"Pick ")+s.name}">${on?"✓":""}</button>`;
+}
+function rowClass(s,base){
+  var a=active();
+  return base+(a&&a.id===s.id?" active":"")+(picked(s.id)&&s.status!=="declined"?"":" off")+(flashing(s.id)?" flash":"");
+}
+function renderTree(){
+  var list=model.suggestions,live=model.canonical;
+  var dupes=list.length-live.length;
+  // Requests reach the agent only while the plan can still change — same rule as the rail.
+  var canRequest=model.phase!=="verify"&&model.phase!=="done";
+  var toolCard=function(s){
+    if(s.duplicate)return html`<div class="tool dupe" title="${"duplicate id: "+s.id}"><i class="tool-status st-unknown"></i><span class="tool-name">${s.name}</span><span class="dupe-badge">duplicate id</span></div>`;
+    return html`<div class="${rowClass(s,"tool")}" data-suggestion="${s.id}"><i class="tool-status ${statusClass(s.status)}" title="${s.status}"></i><span class="tool-name">${s.name}</span>${condMark(s)}${checkBox(s)}</div>`;
+  };
+  setHtml($("#tools"),list.length?html`${dupes?html`<div class="plan-warning">${dupes+" suggestion"+(dupes===1?"":"s")+" repeat an id already in the plan. Only the first of each id is actionable — ask the agent to give them distinct ids."}</div>`:""}${
+    scopeGroups(list).map(function(g){
+      return html`<div class="scope-group"><div class="node scope-node sk-${g.kind}" title="${scopeGroupTitle(g)}">${scopeGlyph(g.kind)}<span class="scope-label">${g.label}</span><span class="page-count">${g.tools.length}</span></div><div class="scope-tools">${g.tools.map(toolCard)}</div></div>`;
+    })
+  }${canRequest?html`<div class="scope-group"><span></span><div class="scope-tools"><button class="tool tool-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="tool-name">Request tool</span></button></div></div>`:""}`:html`<div class="empty-state">No tool suggestions yet. This page updates the moment the agent writes the interactive plan.</div>`);
+
+  renderOutline(list,live,toolCard,dupes,canRequest);
+
+  $("#journeyLabel").textContent=model.site||model.journey||"Waiting for the plan…";
+  $("#journeyNode").title=model.site||"";
+  $("#pageCount").textContent=String(live.length);
+  $("#treeScroll").classList.toggle("outline-mode",ui.view==="outline");
+  $$("[data-view]").forEach(function(b){b.classList.toggle("active",b.dataset.view===ui.view)});
+  renderExtras();
+  requestAnimationFrame(renderLinks);
+}
+/* Outline view: one nested-card document — the site is the root, then a flat
+   run of cards: the global card, one card per page route, then undeclared.
+   Tool rows reuse the map's toolCard markup, so the same delegation drives
+   picks and selection. */
+function outlinePageTitle(where){
+  var segments=safeStr(where).split("/").filter(function(p){return p&&!/^[\[:{(]/.test(p)});
+  var last=(segments.length?segments[segments.length-1]:"").replace(/[-_]+/g," ").trim();
+  return last?last+" page":"page";
+}
+function outlineCount(n){return n+(n===1?" tool":" tools")}
+function renderOutline(list,live,toolCard,dupes,canRequest){
+  if(!list.length){
+    setHtml($("#outline"),html`<div class="empty-state">No tool suggestions yet. This page updates the moment the agent writes the interactive plan.</div>`);
+    return;
+  }
+  var groups=scopeGroups(list);
+  var byKind=function(kind){
+    return groups.filter(function(g){return g.kind===kind})
+      .reduce(function(acc,g){return acc.concat(g.tools)},[]);
+  };
+  var everTools=byKind("everywhere"),undeclaredTools=byKind("undeclared");
+  var pageGroups=groups.filter(function(g){return g.kind==="page"});
+  setHtml($("#outline"),html`<svg class="outline-links" id="outlineLinks" aria-hidden="true"></svg>${dupes?html`<div class="plan-warning">${dupes+" suggestion"+(dupes===1?"":"s")+" repeat an id already in the plan. Only the first of each id is actionable — ask the agent to give them distinct ids."}</div>`:""}<div class="node page">${scopeGlyph("everywhere")}<span class="scope-label" title="${model.site||""}">${model.site||model.journey||"Interactive plan"}</span><span class="page-count">${live.length}</span></div><div class="outline-children">${
+    everTools.length?html`<section class="outline-child outline-card tg-everywhere"><div class="outline-card-head">${scopeGlyph("everywhere")}<span class="outline-card-title">Global</span><span class="outline-count">${outlineCount(everTools.length)}</span></div><p class="outline-card-sub">Available everywhere on the site</p><div class="outline-list">${everTools.map(toolCard)}</div></section>`:""
+  }${
+    pageGroups.map(function(g){
+      return html`<section class="outline-child outline-card tg-page ${ui.outlineClosed.has(g.label)?"":"open"}"><button class="outline-card-head outline-subhead" data-outline-page="${g.label}" type="button" title="${scopeGroupTitle(g)}"><span class="outline-chevron">›</span>${scopeGlyph("page")}<span class="outline-card-title">${outlinePageTitle(g.label)}</span><span class="outline-route">${g.label}</span><span class="outline-count">${outlineCount(g.tools.length)}</span></button><div class="outline-list">${g.tools.map(toolCard)}</div></section>`;
+    })
+  }${
+    undeclaredTools.length?html`<section class="outline-child outline-card tg-undeclared"><div class="outline-card-head">${scopeGlyph("undeclared")}<span class="outline-card-title">Scope not declared</span><span class="outline-count">${outlineCount(undeclaredTools.length)}</span></div><p class="outline-card-sub">The plan does not say where these tools register — ask the agent to declare it</p><div class="outline-list">${undeclaredTools.map(toolCard)}</div></section>`:""
+  }${
+    canRequest?html`<div class="outline-child"><button class="tool tool-ghost" data-request-tool type="button"><span class="ghost-plus">+</span><span class="tool-name">Request tool</span></button></div>`:""
+  }</div>`);
+  requestAnimationFrame(renderOutlineLinks);
+}
+/* One measured path: the rail drops from the site node and a quarter-curve
+   branches into each card at its header line. Drawn after layout, exactly like
+   the map's renderLinks — CSS border rails rasterize apart under canvas zoom. */
+function renderOutlineLinks(){
+  var host=$("#outline"),svg=$("#outlineLinks");
+  if(!host||!svg||ui.view!=="outline")return;
+  var children=$$("#outline>.outline-children>.outline-child"),site=host.querySelector(".node.page");
+  if(!site||!children.length)return;
+  var offset=function(el){
+    var x=0,y=0,node=el;
+    while(node&&node!==host){x+=node.offsetLeft;y+=node.offsetTop;node=node.offsetParent}
+    return{x:x,y:y};
+  };
+  // The rail runs 26px left of the cards — the children container's own edge.
+  var railX=offset(children[0]).x-26,startY=offset(site).y+site.offsetHeight,r=10;
+  var d="";
+  children.forEach(function(child,i){
+    var at=offset(child),y=at.y+26;
+    if(i===children.length-1)d+="M "+railX+" "+startY+" V "+(y-r)+" ";
+    d+="M "+railX+" "+(y-r)+" Q "+railX+" "+y+" "+(railX+r)+" "+y+" H "+at.x+" ";
+  });
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  svg.appendChild(svgPath(d));
+}
+/* Files and plan fields this page has no opinion about stay untouched in the
+   state folder, but the "Also in the state folder" panel read as noise under
+   the canvas — hidden, not deleted, so the record is one comment away. */
+function renderExtras(){setHtml($("#extras"),"");}
+function svgPath(d){
+  var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d",d);return path;
+}
+function renderLinks(){
+  var map=$(".map"),svg=$("#mapLinks"),page=$(".map>.page");
+  if(!map||!svg||!page||ui.view!=="map")return;
+  var point=function(el,side){
+    var x=0,y=0,node=el;
+    while(node&&node!==map){x+=node.offsetLeft;y+=node.offsetTop;node=node.offsetParent}
+    return{x:x+(side==="right"?el.offsetWidth:0),y:y+el.offsetHeight/2};
+  };
+  var curve=function(from,to){
+    var bend=Math.max(30,(to.x-from.x)*.48);
+    return svgPath("M "+from.x+" "+from.y+" C "+(from.x+bend)+" "+from.y+" "+(to.x-bend)+" "+to.y+" "+to.x+" "+to.y);
+  };
+  var from=point(page,"right"),group=document.createDocumentFragment();
+  // Two-hop fan: page → each scope node, scope node → each of its tools. The
+  // scope hop is the point of the map — a tool's curve starts at its scope, so
+  // site-wide and page-scoped tools can never be mistaken for one flat list.
+  $$("#tools>.scope-group").forEach(function(block){
+    var node=block.querySelector(".scope-node");
+    if(!node)return;
+    group.appendChild(curve(from,point(node,"left")));
+    var mid=point(node,"right");
+    Array.prototype.forEach.call(block.querySelectorAll(".scope-tools>.tool[data-suggestion]"),function(card){
+      group.appendChild(curve(mid,point(card,"left")));
+    });
+  });
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  svg.appendChild(group);
+}
+/* The one raw-HTML producer: every slice and token is escaped on the way in. */
+/* Chat replies are markdown-lite: blank-line paragraphs, "- " bullets, **bold**,
+   `code`. Hand-rolled rather than shipping a markdown library — a library would
+   need a sanitizer beside it, and reply text is attacker-influenceable. Every
+   slice goes through esc(); the only characters that survive as markup are the
+   fixed tags written here.
+   ponytail: bold/code/bullets only — headings, links and tables if replies grow
+   past what a chat bubble should hold. */
+function inlineMd(text){
+  var re=/`[^`\n]+`|\*\*[^*\n]+\*\*/g,at=0,out="";
+  text.replace(re,function(token,index){
+    out+=esc(text.slice(at,index));
+    out+=token.charAt(0)==="`"?"<code>"+esc(token.slice(1,-1))+"</code>"
+                              :"<strong>"+esc(token.slice(2,-2))+"</strong>";
+    at=index+token.length;
+  });
+  return out+esc(text.slice(at));
+}
+function mdHtml(value){
+  var lines=safeStr(value).split("\n"),out="",para=[],items=[];
+  function flush(){
+    if(items.length){out+="<ul><li>"+items.join("</li><li>")+"</li></ul>";items=[]}
+    if(para.length){out+="<p>"+para.join("<br>")+"</p>";para=[]}
+  }
+  lines.forEach(function(line){
+    var bullet=/^\s*[-*]\s+(.*)$/.exec(line);
+    if(bullet){if(para.length)flush();items.push(inlineMd(bullet[1]));return}
+    if(!line.trim()){flush();return}
+    if(items.length)flush();
+    para.push(inlineMd(line));
+  });
+  flush();
+  return new Html(out);
+}
+function codeHtml(text){
+  var re=/(?:\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:const|let|var|await|async|function|return|new|import|export|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b)/gm,at=0,out="";
+  text.replace(re,function(token,index){
+    out+=esc(text.slice(at,index));
+    var c=token.indexOf("//")===0?"comment":/^['"]/.test(token)?"string":/^\d/.test(token)?"number":"keyword";
+    out+='<span class="tok-'+c+'">'+esc(token)+"</span>";at=index+token.length;
+  });
+  return new Html(out+esc(text.slice(at)));
+}
+function paramTable(s){
+  if(!s.params.length)return html`<p class="feedback-copy">No parameters described yet.</p>`;
+  return html`<div class="schema"><div class="sh">Name</div><div class="sh">Type</div><div class="sh">Description</div>${
+    s.params.map(function(p){return html`<div><code>${p.name||"—"}</code></div><div>${p.type||"—"}</div><div>${p.description}</div>`})
+  }</div>`;
+}
+function codeSection(s){
+  var code=model.code.get(s.id);
+  if(!code)return html`<p class="feedback-copy">The agent writes the tool code once you submit the interactive plan. It appears here, read only, for review.</p>`;
+  return html`<div class="codebox"><div class="codehead"><span>${code.file}</span><span class="codehead-right"><span>${code.lang}</span><button class="chat-expand" type="button" data-code-expand="${s.id}" title="Open code in a window" aria-label="Open code in a window"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button></span></div><pre class="codeview">${codeHtml(code.text)}</pre></div>`;
+}
+function whySection(s){
+  return html`${s.why?html`<section class="decision-card"><div class="annotatable">${s.why}</div></section>`
+    :html`<p class="feedback-copy">The user need for this tool has not been described yet.</p>`}${
+    s.extras.length?html`<section class="decision-card"><div class="label">Also in the plan</div>${s.extras.map(function(e){
+      return html`<div class="annotatable"><b>${e.key}:</b> ${e.value}</div>`})}</section>`:""}`;
+}
+function noteSection(s){
+  var p=model.phase,text=note(s.id),copy,primary;
+  if(p==="verify"||p==="done")return html`<p class="feedback-copy">${p==="verify"?"Approval received. The agent is running final verification and opening the PR.":"The run is complete."}</p>`;
+  if(p==="review"){copy="Ask the agent to change this tool, or ask a question about it.";primary={id:"sendNote",label:"Send feedback"}}
+  else if(p==="build"){copy="The agent is building. Notes reach it without stopping the build.";primary={id:"sendNote",label:"Send note"}}
+  else{copy="Add a note to send with the interactive plan — it stays here and is saved when you submit.";primary=null}
+  return html`<p class="feedback-copy">${copy}</p><textarea class="whole" id="toolNote" placeholder="Describe a change or ask a question…">${text}</textarea>${
+    primary?html`<div class="note-actions">${text.trim()?html`<span class="tool-feedback-status">Note added</span>`:""}<span class="spacer"></span><button class="small primary" id="${primary.id}" type="button">${primary.label}</button></div>`:""
+  }`;
+}
+function disclosure(id,title,count,body){
+  return html`<details class="disclosure" id="${id}" ${ui.open.get(id)?"open":""}><summary>${title}${count===null?"":html`<span class="summary-count">${count}</span>`}</summary><div class="disclosure-body">${body}</div></details>`;
+}
+/* Which suggestion the detail pane is currently showing. Re-rendering the same
+   one keeps its scroll (a file-watcher update must not yank the reader); moving
+   to a different one starts at the top of the new description. */
+var detailShowing=null,codePulsed=false;
+// The Generated-code disclosure is parked, not deleted, while the window button trials
+// as its replacement in the section stack — flip to true to restore the inline view.
+var SHOW_CODE_DISCLOSURE=false;
+function renderDetail(){
+  var s=active();
+  $(".app").classList.toggle("no-selection",!s);
+  requestAnimationFrame(renderLinks); // the canvas width changes with the panel
+  $(".detail").inert=!s;
+  if(!s){
+    detailShowing=null;
+    $("#title").textContent="No suggestion selected";
+    $("#changeTag").hidden=true;
+    setHtml($("#content"),html`<div class="empty-state">The interactive plan is empty or has not been written yet.<br>This page follows <code>plan.json</code> in the state folder — it fills in as soon as the agent writes it.</div>`);
+    return;
+  }
+  var focused=document.activeElement&&document.activeElement.id==="toolNote"?
+        [document.activeElement.selectionStart,document.activeElement.selectionEnd]:null,
+      sameTool=detailShowing===s.id,
+      scrollWas=content.scrollTop;
+  detailShowing=s.id;
+  $("#title").textContent=s.name;
+  $("#changeTag").hidden=!flashing(s.id);
+  setHtml($("#content"),html`<section class="field"><div class="annotatable">${s.description||"No description yet."}</div></section><section class="field scope-field"><div class="label">Where it lives</div><div class="scope-line">${scopeChip(s)}<span class="scope-note">${scopeDetail(s)}</span></div></section>${
+    model.code.get(s.id)?html`<button class="small code-open" type="button" data-code-expand="${s.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Generated code</button>`:""}${
+    disclosure("parameters","Parameters",null,paramTable(s))}${
+    SHOW_CODE_DISCLOSURE?disclosure("implementation","Generated code",null,codeSection(s)):""}${
+    disclosure("reasoning","Why this tool",null,whySection(s))}${
+    disclosure("notePanel","Notes and questions",note(s.id).trim()?1:null,noteSection(s))}`);
+  content.scrollTop=sameTool?scrollWas:0;
+  if(focused){
+    var box=$("#toolNote");
+    if(box){box.focus();try{box.setSelectionRange(focused[0],focused[1])}catch(e){}}
+  }
+  // The one-shot attention beat: review is read-the-code time, so the Generated-code
+  // row pulses when the inspector first shows in this review — then never again. The
+  // latch is a time window, not a flag: renders rebuild this DOM, so any render inside
+  // the window re-applies the class to the fresh node, and none after.
+  if(model.phase==="review"){
+    var pulseBtn=$("#content .code-open");
+    if(pulseBtn&&codePulsed===false)codePulsed=performance.now()+2100;
+    if(pulseBtn&&performance.now()<codePulsed){
+      pulseBtn.classList.add("pulse");
+      pulseBtn.addEventListener("animationend",function(){pulseBtn.classList.remove("pulse")});
+    }
+  }
+}
+/* ── Typewriter reveal ────────────────────────────────────────────────────────
+   Nothing here is real streaming and it must not pretend to be: server.ts is
+   folder-as-truth and publishes a changed state file WHOLE, so by the time the page
+   hears anything the agent's reply already exists in full. This only reveals text
+   that has already landed.
+   It deliberately runs OUTSIDE renderChat. renderChat rebuilds the entire list with
+   setHtml, so driving it per character would re-render every message ~60×/s; instead
+   one frame writes one text node's nodeValue, nothing re-parses, and the markdown,
+   pills and lists mdHtml produced stay intact while their text fills in.
+   Re-entrant by design — a state push mid-reveal re-renders the list and lands back
+   here, so the position is carried across and the reveal resumes rather than
+   restarting or snapping. */
+var REDUCED_MOTION=matchMedia("(prefers-reduced-motion:reduce)"),reveal=null;
+function stopReveal(){if(reveal){cancelAnimationFrame(reveal.raf);reveal=null}}
+function revealNodes(el){
+  var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:function(n){
+    // .who and .msg-meta are chrome, not the reply — typing out the timestamp would be absurd
+    return n.parentElement&&n.parentElement.closest(".who,.msg-meta")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT
+  }}),out=[],n;
+  while(n=w.nextNode())out.push(n);
+  return out;
+}
+function revealPaint(done){
+  var r=reveal,left=r.pos,i,len,want;
+  for(i=0;i<r.nodes.length;i++){
+    len=r.full[i].length;
+    want=left>=len?r.full[i]:(left>0?r.full[i].slice(0,left):"");
+    if(r.nodes[i].nodeValue!==want)r.nodes[i].nodeValue=want;
+    left=left>=len?left-len:0;
+  }
+  // A paragraph or bullet whose text has not been reached yet is hidden outright rather
+  // than left standing empty — otherwise the whole skeleton (three bare list markers) is
+  // there from the first frame and the effect reads as a loading placeholder. The list
+  // grows as it types instead, and the chat is pinned to the bottom so growth is natural.
+  var blk=null,any=false;
+  for(i=0;i<=r.nodes.length;i++){
+    var here=i<r.nodes.length?r.blocks[i]:null;
+    if(here!==blk){
+      if(blk)blk.style.display=(done||any)?"":"none";
+      blk=here;any=false;
+    }
+    if(i<r.nodes.length&&r.nodes[i].nodeValue)any=true;
+  }
+}
+function revealStep(){
+  var r=reveal;if(!r)return;
+  r.pos=Math.min(r.total,Math.round((performance.now()-r.start)/1000*r.rate));
+  revealPaint(r.pos>=r.total);
+  if(r.stick)r.chat.scrollTop=r.chat.scrollHeight;
+  if(r.pos>=r.total){reveal=null;return}
+  r.raf=requestAnimationFrame(revealStep);
+}
+function revealLast(chat,shown,stick){
+  var last=shown.length?shown[shown.length-1]:null,
+      same=!!last&&ui.revealTs===last.ts,
+      pos=(reveal&&same)?reveal.pos:0;
+  stopReveal();
+  if(!last||last.who!=="claude"||REDUCED_MOTION.matches){ui.revealTs=last&&last.ts;return}
+  ui.revealTs=last.ts;
+  if(!same&&!ui.revealReady)return;   // first paint of existing history — show it, don't type it
+  if(same&&!pos)return;               // already revealed in full
+  var msgs=chat.querySelectorAll(".msg:not(.typing)"),el=msgs[msgs.length-1];
+  if(!el)return;
+  var nodes=revealNodes(el),full=[],blocks=[],total=0,i;
+  for(i=0;i<nodes.length;i++){
+    full.push(nodes[i].nodeValue);total+=full[i].length;
+    blocks.push(nodes[i].parentElement&&nodes[i].parentElement.closest("li,p"));
+  }
+  if(pos>=total)return;
+  // Paced in wall-clock, NOT chars-per-frame: rAF fires at the display's refresh rate, so
+  // a per-frame budget types twice as fast on a 120Hz laptop as on a 60Hz monitor (and
+  // unthrottled in headless). ~180 chars/s, but a long reply speeds up so it still lands
+  // in ~4s instead of crawling for twenty. No caret — mdHtml can end on a <ul>, and
+  // chasing the last text node with one is more code than the effect is worth.
+  var rate=Math.max(180,total/4);
+  reveal={raf:0,pos:pos,total:total,rate:rate,start:performance.now()-pos/rate*1000,
+          nodes:nodes,full:full,blocks:blocks,chat:chat,stick:stick};
+  revealPaint();
+  reveal.raf=requestAnimationFrame(revealStep);
+}
+function renderChat(){
+  if(ui.awaitingReply&&claudeCount()>ui.claudeSeen)ui.awaitingReply=false;
+  var all=model.chat.concat(ui.chatLocal).sort(function(a,b){return a.ts<b.ts?-1:a.ts>b.ts?1:0}),
+      chat=$("#chat"),hidden=Math.max(0,all.length-CHAT_WINDOW),
+      empty=!all.length&&!ui.awaitingReply;
+  var shown=(ui.chatExpanded||!hidden)?all:all.slice(-CHAT_WINDOW);
+  // A new message always comes into view; otherwise only stick when already at the bottom.
+  var grew=all.length>ui.chatCount;
+  ui.chatCount=all.length;
+  var stick=grew||chat.scrollTop+chat.clientHeight>=chat.scrollHeight-30;
+  setHtml(chat,html`${
+    (hidden&&!ui.chatExpanded)?html`<button class="small chat-earlier" id="showEarlier">Show ${hidden} earlier</button>`:""
+  }${shown.map(function(m){
+    var linked=m.re&&model.byId.get(m.re); // pill only when it can point at a real node
+    // data-copy carries the ts, not the text: the body is untrusted and has no business
+    // being round-tripped through an attribute when the model can be looked up on click.
+    return html`<div class="msg ${m.who==="claude"?"claude":"you"}"><span class="who">${m.who==="you"?"You":"Agent"}${linked?html`<button class="msg-pill" type="button" data-goto="${m.re}" title="Show this tool">${m.re}</button>`:(m.re?" · "+m.re:"")}</span>${mdHtml(m.text)}<span class="msg-meta"><time class="msg-time" datetime="${m.ts}">${clockTime(m.ts)}</time><button class="msg-copy" type="button" data-copy="${m.ts}" title="Copy message" aria-label="Copy message"><svg class="sheets" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></div>`;
+  })}${ui.awaitingReply?html`<div class="msg claude typing"><span class="who">Agent</span><span class="dots"><i></i><i></i><i></i></span></div>`:""}${
+    empty?html`<div class="chat-empty">Notes you send and the agent's replies appear here.</div>`:""}`);
+  revealLast(chat,shown,stick||ui.awaitingReply);
+  ui.revealReady=true;
+  if(stick||ui.awaitingReply)chat.scrollTop=chat.scrollHeight;
+  var closed=model.phase==="verify"||model.phase==="done";
+  [["#chatModalInput","Message the agent…"],["#convInput","Ask for changes or leave feedback…"]].forEach(function(f){
+    var el=$(f[0]);el.disabled=closed;el.placeholder=closed?"Conversation closed":f[1];
+  });
+  $("#chatModalSend").disabled=closed;$("#convSend").disabled=closed;
+  $(".app").classList.toggle("chat-min",ui.chatMinimized&&!empty);
+  $(".review").classList.toggle("minimized",ui.chatMinimized);
+  var chev=ui.chatMinimized?"18 15 12 9 6 15":"6 9 12 15 18 9";
+  $("#chatMinimize").querySelector("polyline").setAttribute("points",chev);
+  $("#chatMinimize").title=ui.chatMinimized?"Show conversation":"Minimize conversation";
+  $("#chatMinimize").setAttribute("aria-label",$("#chatMinimize").title);
+}
+var PHASE_COPY={
+  boot:{status:"Waiting for the agent",label:"Note for the agent",placeholder:"Ask a question (optional)"},
+  propose:{status:"Interactive plan ready",label:"Note for the whole plan",placeholder:"Ask a question or request a change before you submit (optional)"},
+  build:{status:"Building tools",label:"Note for the agent",placeholder:"Send a note while the tools are being built"},
+  review:{status:"Ready for review",label:"Feedback on the plan",placeholder:"Request a change across the plan, or ask a question"},
+  verify:{status:"Verifying tools",label:"Verification in progress",placeholder:""},
+  done:{status:"Run complete",label:"Conversation closed",placeholder:""}
+};
+function phaseCopy(p){
+  return Object.prototype.hasOwnProperty.call(PHASE_COPY,p)?PHASE_COPY[p]
+    :{status:p,label:"Note for the agent",placeholder:"Ask a question (optional)"};
+}
+function renderPhase(){
+  var order=["propose","build","review","verify","done"],current=model.phase,index=order.indexOf(current);
+  $$("#phaseSteps [data-phase-step]").forEach(function(el){
+    var at=order.indexOf(el.dataset.phaseStep),active=at===index;
+    el.classList.toggle("current",active);el.classList.toggle("complete",index>at);
+    if(active)el.setAttribute("aria-current","step");else el.removeAttribute("aria-current");
+  });
+}
+function noteCount(){
+  var k=0;
+  model.canonical.forEach(function(s){if(note(s.id).trim())k++});
+  if(ui.general.trim())k++;
+  return k;
+}
+function durableWaitCopy(state){
+  if(state==="timeout")return "Saved safely. This run’s agent task hasn’t handled it yet — resume or message that original task. If /hooks there lists this plugin, review its hook trust.";
+  if(state==="conflict"||state==="error")return "Saved safely, but automatic delivery needs attention. Resume or message this run’s original agent task. If /hooks there lists this plugin, review its hook trust.";
+  if(state==="waiting"||state==="claimed")return "Saved — waiting for this run’s agent task";
+  return "Saved — but the agent isn’t watching right now. Nudge the terminal session that started this run to continue; a fresh session can pick it up from the saved state.";
+}
+function matchingRecordedEvent(r){
+  if(!RUN_ID||snapshotSeq<=r.reconcileAfter||(r.type!=="submit"&&r.type!=="approve"&&r.type!=="connect"))return null;
+  var match=null;
+  model.feedback.forEach(function(e){
+    if(e._legacy||e.run_id!==RUN_ID||e.type!==r.type||!safeStr(e.event_id)||!Number.isSafeInteger(e.order)||e.order<=r.afterOrder)return;
+    var eventTs=Date.parse(safeStr(e.ts));
+    if(!Number.isFinite(eventTs)||eventTs<r.createdAt||canonicalJson(e._payload)!==r.payloadKey)return;
+    if(!match||e.order<match.order)match=e;
+  });
+  return match;
+}
+function beginReconciliation(r){
+  if(r.state!=="uncertain"||snapshotSeq<=r.reconcileAfter)return;
+  r.state="reconciling";r.reconcileSnapshot=snapshotSeq;
+  clearTimeout(r.reconcileTimer);
+  var settle=function(){
+    if(r.state!=="reconciling"||snapshotSeq<r.reconcileSnapshot||matchingRecordedEvent(r))return;
+    // A file notification can land at the grace boundary while queueFiles still holds
+    // its newer journal snapshot. Never expose Retry against the stale normalized model.
+    if(queued||pending!==null){r.reconcileTimer=setTimeout(settle,20);return}
+    r.state="retryable";r.reconcileTimer=null;
+    var failed=r.onError;r.onError=null;if(failed)failed();
+    if(model)render();
+  };
+  r.reconcileTimer=setTimeout(settle,RECONCILE_GRACE_MS);
+}
+function syncRequests(){
+  requests.forEach(function(r,id){
+    if(r.state==="uncertain"||r.state==="reconciling"||r.state==="retryable"){
+      var match=matchingRecordedEvent(r);
+      if(match)confirmRequest(r,match);else beginReconciliation(r);
+    }
+    if(!r.eventId||!model.handled.has(r.eventId)||r.state==="handled")return;
+    r.state="handled";
+    setTimeout(function(){if(requests.get(id)===r){requests.delete(id);if(model)renderReview()}},2200);
+  });
+}
+function deliveryLine(){
+  var r=latestRequest();
+  if(r){
+    if(r.state==="saving")return "Saving…";
+    if(r.state==="uncertain")return "Save unconfirmed — waiting for a fresh journal snapshot before retrying.";
+    if(r.state==="reconciling")return "Checking the refreshed journal before retrying…";
+    if(r.state==="retryable")return "The action was not recorded. It is safe to retry.";
+    if(r.state==="handled")return "Handled by the agent";
+    if(r.state==="recorded")return durableWaitCopy(deliveryState({event_id:r.eventId,order:r.order}));
+  }
+  var e=model.latestUnacked;
+  return e?durableWaitCopy(deliveryState(e)):"";
+}
+/* Every state the status box can be in — it is the one place that always says
+   what is happening and what to do next. */
+function statusLine(p,list,n){
+  if(ui.connDown)return "Disconnected — locally pending sends may not be saved. Already recorded actions remain durable.";
+  var delivery=deliveryLine();if(delivery)return delivery;
+  if(!list.length)return "Waiting for the agent to write the plan…";
+  if(p==="propose"||p==="boot"){
+    if(submittedNow())return "Plan submitted · waiting for the coding agent…";
+    // Status-bar idiom: short segments, not prose.
+    var total=list.length,k=noteCount(),segs=[];
+    if(!n)segs.push("No tools selected");
+    else if(n===total)segs.push(total===1?"1 tool selected":"All "+total+" tools selected");
+    else segs.push(n+" of "+total+" selected");
+    if(n&&n<total)segs.push((total-n)+" will be skipped");
+    if(k)segs.push(k===1?"1 note attached":k+" notes attached");
+    segs.push(n?"ready to submit":"pick at least one to build");
+    return segs.join(" · ");
+  }
+  if(p==="build"){
+    var built=list.filter(function(s){return s.status==="review"||s.status==="approved"}).length,
+        cur=list.filter(function(s){return s.status==="building"})[0];
+    if(!built&&!cur)return "Plan submitted. Waiting for a response from the coding agent…";
+    return "The coding agent is building the tools — "+built+" done"+(cur?", now building "+cur.name:"")+"…";
+  }
+  if(p==="review"){
+    if(model.approval)return model.handled.has(model.approval.event_id)
+      ?"Approval handled by the agent. Waiting for verification to start…"
+      :"Approval saved. Waiting for the agent to handle it…";
+    var b=list.filter(function(s){return s.status==="review"||s.status==="approved"}).length;
+    return b+" tool"+(b===1?"":"s")+" built — review, then approve or send feedback.";
+  }
+  if(p==="verify")return "Approved. The coding agent is verifying the tools and opening the PR…";
+  if(p==="done")return "Run complete — the tools are shipped and the PR is open.";
+  return "Waiting for the agent…";
+}
+function renderRail(p){
+  var dead=p==="verify"||p==="done"||!model.canonical.length;
+  $("#railNote").disabled=dead;
+  $("#railNote").hidden=p==="done";
+  $("#railRequest").disabled=dead;
+  $("#railNote").classList.toggle("has-content",!!ui.general.trim());
+  if(dead&&ui.railMode)return closeRail();
+  if(!ui.railMode)return;
+  var noteMode=ui.railMode==="note";
+  $("#railFlyoutTitle").textContent=noteMode?"Note for the whole plan":"Request another tool";
+  $("#railFlyoutInput").placeholder=noteMode
+    ?(p==="review"?"What should change before you approve?":p==="build"?"The note reaches the agent without stopping the build…":"Ask a question or request a change — it rides along when you submit…")
+    :"Describe the tool or the missing capability…";
+  $("#railFlyoutAction").textContent=noteMode?(p==="propose"?"Save":p==="review"?"Send feedback":"Send"):"Request";
+}
+function renderReview(){
+  var p=model.phase,list=model.canonical,n=pickedIds().length,primary=$("#primaryAction");
+  renderPhase();
+  $("#statusBox").textContent=statusLine(p,list,n);
+  $("#tourButton").disabled=!list.length;
+  $("#tourButton").title=list.length?"Start the guided tour":"The tour is available once the agent suggests a tool";
+  primary.className="submit";
+  var setPrimary=function(text,disabled,busy){
+    $("#primaryLabel").textContent=text;primary.disabled=disabled;
+    primary.classList.toggle("is-busy",!!busy);
+  };
+  // Press feedback is immediate, but success waits for the durable `recorded` response.
+  var gate=null;requests.forEach(function(r){
+    if((r.type==="submit"||r.type==="approve")&&
+      (r.state==="uncertain"||r.state==="reconciling"||r.state==="retryable")&&(!gate||r.created>gate.created))gate=r;
+  });
+  if(gate&&gate.state==="retryable")setPrimary(gate.type==="approve"?"Retry approval":"Retry submit",false,false);
+  else if(gate&&gate.state==="reconciling")setPrimary("Checking save…",true,false);
+  else if(gate)setPrimary("Save unconfirmed",true,false);
+  else if(ui.approving||ui.submitting)setPrimary("Saving…",true,false);
+  else if(p==="review"){
+    if(model.approval)setPrimary(model.handled.has(model.approval.event_id)?"Approved":"Approval saved",true,false);
+    else if(ui.approved)setPrimary("Approval saved",true,false);
+    else setPrimary("Approve tools",false);
+  }
+  else if(p==="build")setPrimary("Building tools…",true,true);
+  else if(p==="verify")setPrimary("Verifying tools…",true,true);
+  else if(p==="done")setPrimary("Approved",true);
+  else if(submittedNow())setPrimary("Plan submitted",true,true);
+  else setPrimary("Submit",!list.length||!n);
+  primary.hidden=p==="done"; // a finished run has nothing left to press — the status line says it all
+  renderRail(p);
+}
+/* The mockup's simulated "coding agent" stage, now driven by real build steps. */
+/* Collapses a tool's code/verify steps into one checklist state. The inspector keeps
+   the full chips; this card is the glanceable summary. */
+function buildRowState(s){
+  // The build card speaks of testing; the verify card of verifying — same steps, the
+  // phase picks the word.
+  var v=model.phase==="verify",st=model.steps.get(s.id),code=st&&st.get("code"),verify=st&&st.get("verify");
+  if(verify&&verify.state==="done"){
+    var o=verify.outcome;
+    if(o==="verified")return{ico:"✓",cls:"ok",phrase:v?"verified":"built and tested"};
+    if(o==="failed")return{ico:"✗",cls:"bad",phrase:"failed"};
+    if(o)return{ico:"!",cls:"warn",phrase:String(o).replace(/-/g," ")};
+    return{ico:"!",cls:"warn",phrase:(v?"verification":"testing")+" finished without an outcome"};
+  }
+  if(verify&&verify.state==="start")return{spin:true,phrase:v?"verifying…":"testing…"};
+  // In the verify phase a coded tool with no verify step is one the ladder has not reached
+  // yet (the phase entry reset its build-time chip) — queued, not spinning.
+  if(code&&code.state==="done")return v?{ico:"○",cls:"idle",phrase:"queued"}:{spin:true,phrase:"coded"};
+  if(code&&code.state==="start")return{spin:true,phrase:"coding…"};
+  return{ico:"○",cls:"idle",phrase:"queued"};
+}
+/* How long the finished tools took, in seconds — one sample per tool that ran the whole
+   ladder, measured from its own `code start` to its own `verify done`. Tools build one at a
+   time, so the mean of those samples times the number left is the whole estimate. It is
+   deliberately shown with a tilde and rounded to the minute above 90s: `ts` is
+   second-granularity and a normal run is 3-10 tools, so most of the time this is
+   extrapolating from one or two samples. With zero samples there is no honest estimate and
+   the caller renders nothing rather than a guess. */
+function toolDurations(rows){
+  // In the verify phase a tool's sample is its own ladder (verify start → done): pairing the
+  // fresh done with the build-time code start would count the whole review dwell as work.
+  var v=model.phase==="verify",out=[];
+  rows.forEach(function(s){
+    var st=model.steps.get(s.id);if(!st)return;
+    var code=st.get("code"),verify=st.get("verify");
+    if(!verify||verify.state!=="done"||(!v&&!code))return;
+    var a=Date.parse(v?(verify.startTs||verify.ts):(code.startTs||code.ts)),b=Date.parse(verify.ts);
+    if(isFinite(a)&&isFinite(b)&&b>a)out.push((b-a)/1000);
+  });
+  return out;
+}
+function etaText(rows,built){
+  var d=toolDurations(rows),left=rows.length-built;
+  if(!d.length||left<=0)return "";
+  var mean=d.reduce(function(a,b){return a+b},0)/d.length,secs=Math.round(mean*left);
+  if(secs<90)return "~"+Math.max(10,Math.round(secs/10)*10)+" sec left";
+  return "~"+Math.round(secs/60)+" min left";
+}
+function connectState(){var step=model&&model.runSteps.get("connect");return step?safeStr(step.state):""}
+function connectBlocksStage(){var state=connectState();return state==="offer"||state==="start"||state==="failed"||(state==="done"&&!ui.connectClosed)}
+function renderStage(){
+  var p=model.phase,running=(p==="build"||p==="verify")&&!connectBlocksStage(),show=running&&!ui.stageClosed;
+  // Every tool in the run is on the board from the first frame — queued until its turn —
+  // so the list's length never changes, only each row's state. Declined tools stay off.
+  // Counted up here rather than after the early return below, because the status-bar button
+  // needs these same numbers precisely when the card is shut.
+  var rows=model.canonical.filter(function(s){return s.status!=="declined"});
+  var built=rows.filter(function(s){
+    var st=model.steps.get(s.id),vf=st&&st.get("verify");return vf&&vf.state==="done";
+  }).length;
+  // The reopen affordance lives in the status bar beside "Add note", not the header: it is
+  // about the run, so it belongs next to the other two things you do to a run. It says what it
+  // is in words and carries the count, instead of being a glyph you click to interrogate.
+  $("#stageButton").hidden=!(running&&ui.stageClosed);
+  $("#stageButton").textContent=(p==="verify"?"Verify status":"Build status")+(rows.length?" · "+built+"/"+rows.length:"");
+  $("#stageButton").title="Reopen the progress window";
+  var stage=$("#agentStage");
+  if(show&&!stage.open)stage.showModal();
+  if(!show&&stage.open)stage.close();
+  if(!show)return;
+  $("#agentStageTitle").textContent=p==="verify"?"Verifying your tools":"Building your tools";
+  var states=rows.map(buildRowState);
+  // The build is live the moment the card is up: when nothing is running yet, the
+  // first queued tool is the one being started — show it working, not waiting.
+  if(!states.some(function(r){return r.spin})){
+    for(var i=0;i<states.length;i++){if(states[i].phrase==="queued"){states[i]={spin:true,phrase:p==="verify"?"verifying…":"coding…"};break}}
+  }
+  var out=rows.map(function(s,i){
+    var r=states[i];
+    return html`<div class="build-row">${r.spin?html`<span class="agent-spinner"></span>`:html`<span class="row-ico ${r.cls}">${r.ico}</span>`}<strong>${s.name}</strong><span class="row-phrase">— ${r.phrase}</span></div>`;
+  });
+  // The finish is work too: run-level steps (docs, pr) get their own rows, and the card
+  // closes only at phase done — its close means the run is complete, never in-between.
+  if(p==="verify"){
+    var RUN_LABEL={docs:["updating the docs…","docs updated"],pr:["opening the pull request…","pull request opened"]};
+    model.runSteps.forEach(function(v,k){
+      if(k==="connect")return;
+      var l=RUN_LABEL[k]||[k+"…",k+" done"],done=v.state==="done";
+      out.push(html`<div class="build-row">${done?html`<span class="row-ico ok">✓</span>`:html`<span class="agent-spinner"></span>`}<span class="row-phrase">${done?l[1]:l[0]}</span></div>`);
+    });
+    var toolsDone=rows.length&&rows.every(function(s,i){return !states[i].spin&&states[i].phrase!=="queued"});
+    var anyRunSpinning=false;model.runSteps.forEach(function(v,k){if(k!=="connect"&&v.state!=="done")anyRunSpinning=true});
+    if(toolsDone&&!anyRunSpinning)out.push(html`<div class="build-row"><span class="agent-spinner"></span><span class="row-phrase">wrapping up the run…</span></div>`);
+  }
+  setHtml($("#buildList"),out.length?out:html`<div class="build-row bare"><span class="agent-spinner"></span><strong>Starting…</strong></div>`);
+
+  // The headline may not claim a verdict the outcomes don't back: "verified" only when
+  // every finished tool actually verified — otherwise say "checked" and break the tally out.
+  var count;
+  if(!rows.length)count="Starting…";
+  else if(p!=="verify")count=built+" of "+rows.length+" tools built";
+  else{
+    var tally=new Map();
+    rows.forEach(function(s){
+      var vs=model.steps.get(s.id),vf=vs&&vs.get("verify");
+      if(vf&&vf.state==="done"){var o=vf.outcome||"no outcome";tally.set(o,(tally.get(o)||0)+1)}
+    });
+    var others=[];
+    tally.forEach(function(n,o){if(o!=="verified")others.push(", "+n+" "+o.replace(/-/g," "))});
+    count=others.length
+      ? built+" of "+rows.length+" tools checked — "+(tally.get("verified")||0)+" verified"+others.join("")
+      : built+" of "+rows.length+" tools verified";
+  }
+  $("#stageCount").textContent=count;
+  $("#stageEta").textContent=etaText(rows,built);
+  var bar=$("#stageBar");
+  // No value at all = the platform's indeterminate bar, which is the truth before the first
+  // tool finishes; there is nothing to divide by yet. The bar tracks TOOLS — the run-level
+  // docs/pr rows above are not tools, and the "wrapping up" row is what speaks for them.
+  if(rows.length&&built)bar.value=built/rows.length; else bar.removeAttribute("value");
+  $("#cancelBuild").textContent=p==="verify"?"Stop verifying":"Stop the build";
+}
+function connectPending(){
+  if(ui.connectSaving||ui.connectAction)return true;
+  var event=model.connectDecision;
+  return !!(event&&!model.handled.has(safeStr(event.event_id)));
+}
+function renderConnect(){
+  var state=connectState(),done=state==="done",show=state==="offer"||state==="start"||state==="failed"||(done&&!ui.connectClosed);
+  var stage=$("#connectStage");
+  if(!show){if(stage.open)stage.close();return}
+  $("#connectTitle").textContent=done
+    ?"Connected — "+model.canonical.filter(function(s){return s.status!=="declined"}).length+" tools ready"
+    :"Connect WebMCP Kit to AgentLane";
+  $("#connectCopy").textContent=done
+    ?"AgentLane is ready to show this project's registered tools and activity."
+    :state==="start"
+      ?"Finish the secure browser sign-in. Setup continues here automatically."
+      :state==="failed"
+        ?"The connection did not finish. Your built tools are unchanged — retry or skip for now."
+        :"See registered tools and their activity in AgentLane. Your built tools stay in this project.";
+  $("#connectActions").hidden=done;
+  $("#connectClose").hidden=!done;
+  var disabled=state==="start"||connectPending();
+  $("#startConnect").disabled=disabled;
+  $("#startConnect").textContent=state==="start"?"Connecting…":"Connect to AgentLane";
+  $("#skipConnect").disabled=disabled;
+  stage.setAttribute("aria-busy",state==="start"?"true":"false");
+  if(!stage.open)stage.showModal();
+}
+function render(){renderTree();renderDetail();renderReview();renderStage();renderConnect();renderChat();refreshCodeModal();maybeOfferTour()}
+function animateDetailOpen(){
+  var pane=$(".detail");pane.classList.remove("entering");void pane.offsetWidth;pane.classList.add("entering");
+}
+
+function onFiles(){
+  model=normalize();
+  syncRequests();
+  syncPicks();
+  markChanges();
+  if(prevPhase&&model.phase!==prevPhase){
+    ui.stageClosed=false;ui.submitted=false;ui.approved=false;codePulsed=false;
+  }
+  var nextConnectState=connectState();
+  if(nextConnectState!==prevConnectState){
+    if(nextConnectState==="offer"||nextConnectState==="failed"){
+      ui.connectAction="";ui.connectSaving=false;ui.connectClosed=false;
+    }else if(nextConnectState==="done")ui.connectClosed=false;
+    prevConnectState=nextConnectState;
+  }
+  if(model.phase==="done")finished=true;
+  // Review is about reading the tools: on entering it (or loading into it) with no
+  // selection, open the first tool's inspector. Only on the transition — closing the
+  // panel mid-review must stick.
+  if(model.phase==="review"&&prevPhase!==model.phase&&!ui.activeId&&model.canonical.length)
+    ui.activeId=model.canonical[0].id;
+  prevPhase=model.phase;
+  render();
+  if(!fitted&&model.canonical.length){fitted=true;requestAnimationFrame(fitCanvas)}
+}
+
+/* ── Sending events ──────────────────────────────────────────────────────────── */
+function sendNote(id){
+  var text=note(id).trim();
+  if(!text)return toast("Write a note first");
+  var type=model.phase==="review"?"feedback":"comment";
+  send(type,{suggestion:id,text:text},function(){
+    if(note(id).trim()===text)ui.notes.delete(id);
+    expectReply();render();
+  });
+}
+function submitPlan(){
+  var ids=pickedIds();
+  if(!ids.length)return toast("Pick at least one tool suggestion");
+  var general=ui.general.trim(),picks=ids.map(function(id){return{suggestion:id,note:note(id).trim()}});
+  ui.submitting=true;renderReview();
+  var failed=function(){ui.submitting=false;renderReview()};
+  var submit=function(){send("submit",{picks:picks},function(){
+    ui.notes.clear();ui.general="";ui.stageClosed=false;ui.submitting=false;ui.submitted=true;closeRail();render();
+  },failed)};
+  if(general)send("comment",{suggestion:null,text:general},function(){
+    if(ui.general.trim()===general)ui.general="";
+    expectReply();submit();
+  },failed);else submit();
+}
+function sendGeneral(type){
+  var text=ui.general.trim();
+  if(!text)return toast("Write a note first");
+  send(type,{suggestion:null,text:text},function(){
+    if(ui.general.trim()===text)ui.general="";
+    expectReply();render();
+  });
+}
+function sendToolRequest(){
+  var text=ui.toolRequest.trim();
+  if(!text)return toast("Describe the tool or capability first");
+  send("comment",{suggestion:null,text:"Tool request: "+text},function(){
+    if(ui.toolRequest.trim()===text)ui.toolRequest="";
+    expectReply();closeRail();render();
+  });
+}
+function approve(){
+  ui.approving=true;renderReview();
+  send("approve",{},function(){ui.approving=false;ui.approved=true;render()},function(){ui.approving=false;renderReview()});
+}
+function chooseConnect(action){
+  ui.connectAction=action;ui.connectSaving=true;renderConnect();
+  send("connect",{action:action},function(){ui.connectSaving=false;renderConnect()},function(){
+    ui.connectAction="";ui.connectSaving=false;renderConnect();
+  });
+}
+
+/* ── Wiring ──────────────────────────────────────────────────────────────────── */
+var toastTimer=null;
+function toast(msg){var t=$("#toast");clearTimeout(toastTimer);t.textContent=msg;t.classList.add("show");toastTimer=setTimeout(function(){t.classList.remove("show")},1700)}
+function closeRail(){var f=$("#railFlyout");ui.railMode=null;if(f.open)f.close()}
+function openRail(mode){
+  ui.railMode=mode;
+  var f=$("#railFlyout");
+  if(!f.open)f.showModal();
+  var t=$("#railFlyoutInput");
+  t.value=mode==="note"?ui.general:ui.toolRequest;
+  renderRail(model?model.phase:"boot");
+  updateRailCount();
+  t.focus();
+}
+function updateRailCount(){
+  var t=$("#railFlyoutInput");
+  $("#railFlyoutCount").textContent=t.value.length+"/"+t.maxLength;
+}
+document.addEventListener("click",function(e){
+  var x=e.target.closest("[data-toggle]");
+  if(x){e.preventDefault();e.stopPropagation();return setPick(x.dataset.toggle,!picked(x.dataset.toggle))}
+  if(e.target.closest("#showEarlier")){ui.chatExpanded=true;return renderChat()}
+  x=e.target.closest("[data-expand-file]");
+  if(x){ui.expandedFiles.add(x.dataset.expandFile);return renderExtras()}
+  x=e.target.closest("[data-outline-page]");
+  if(x){
+    var route=x.dataset.outlinePage;
+    ui.outlineClosed.has(route)?ui.outlineClosed.delete(route):ui.outlineClosed.add(route);
+    return renderTree();
+  }
+  x=e.target.closest("[data-suggestion]");
+  if(x){
+    if(ui.activeId===x.dataset.suggestion)return;
+    var opening=!active();ui.activeId=x.dataset.suggestion;render();
+    if(opening)animateDetailOpen();return;
+  }
+});
+var content=$("#content"),scrollBefore=0;
+content.addEventListener("pointerdown",function(e){if(e.target.closest("summary"))scrollBefore=content.scrollTop});
+document.addEventListener("toggle",function(e){if(e.target.id)ui.open.set(e.target.id,e.target.open)},true);
+content.addEventListener("toggle",function(){requestAnimationFrame(function(){content.scrollTop=Math.min(scrollBefore,Math.max(0,content.scrollHeight-content.clientHeight))})},true);
+content.addEventListener("input",function(e){
+  if(e.target.id!=="toolNote")return;
+  var s=active();if(!s)return;
+  ui.notes.set(s.id,e.target.value);
+  renderReview(); // the status box counts notes live
+});
+var noteLogTimer=null;
+content.addEventListener("input",function(e){
+  if(e.target.id!=="toolNote"||model.phase!=="propose")return;
+  var s=active();if(!s)return;
+  clearTimeout(noteLogTimer);
+  noteLogTimer=setTimeout(function(){
+    var text=note(s.id).trim();
+    logLocal(s.name,text?"Added a note: \u201c"+text+"\u201d":"Removed the note","note:"+s.id);
+  },900);
+});
+content.addEventListener("click",function(e){
+  var s=active();if(!s)return;
+  if(e.target.closest("#sendNote")){ui.notes.set(s.id,$("#toolNote").value);return sendNote(s.id)}
+});
+$("#railNote").onclick=function(){ui.railMode==="note"?closeRail():openRail("note")};
+$("#railRequest").onclick=function(){ui.railMode==="request"?closeRail():openRail("request")};
+document.addEventListener("click",function(e){if(e.target.closest("[data-request-tool]"))openRail("request")});
+$("#railFlyoutClose").onclick=closeRail;
+/* Close on a real backdrop click only. A click with target===dialog can also
+   come from the frame's resize grip, so both press and release must land
+   outside the dialog box. */
+function wireBackdropClose(dlg,close){
+  var downOutside=false;
+  function outside(e){var r=dlg.getBoundingClientRect();return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom}
+  dlg.addEventListener("pointerdown",function(e){downOutside=outside(e)});
+  dlg.addEventListener("click",function(e){if(e.target===dlg&&downOutside&&outside(e))close()});
+}
+/* Stopping the build is a REQUEST, not an abort, and the copy says so. Nothing here can
+   interrupt a tool call in flight: the event is recorded, relayed to the agent's Monitor,
+   and honoured at its next pause between tool calls. So the confirm spells out what
+   survives, and the toast promises "asked", not "stopped". Plain buttons rather than a
+   <form method="dialog"> — the CSP sets `form-action 'none'`, and a native dialog already
+   gives Escape and focus containment without a form in the middle. */
+$("#cancelBuild").onclick=function(){
+  var left=model.canonical.filter(function(s){
+    if(s.status==="declined")return false;
+    var st=model.steps.get(s.id),vf=st&&st.get("verify");return !(vf&&vf.state==="done");
+  }).length;
+  $("#cancelConfirmBody").textContent="The tool being worked on now will finish — nothing can interrupt it mid-write. "
+    +(left>1?left-1+" tools still queued would be left unbuilt. ":"Nothing else is queued. ")
+    +"Everything already built is kept, and the agent picks this up at its next pause.";
+  $("#cancelConfirm").showModal();
+};
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-cancel-build]");
+  if(!b)return;
+  $("#cancelConfirm").close();
+  if(b.dataset.cancelBuild!=="stop")return;
+  send("cancel",{},function(){toast("Saved — the agent will stop after the current tool")});
+});
+wireBackdropClose($("#cancelConfirm"),function(){$("#cancelConfirm").close()});
+wireBackdropClose($("#railFlyout"),closeRail);
+$("#railFlyout").addEventListener("close",function(){ui.railMode=null});
+/* The conversation window reuses the live #chat node — renderChat keeps
+   updating it wherever it lives; closing puts it back in the footer. */
+var chatModal=$("#chatModal");
+$("#chatExpand").onclick=function(){
+  $("#chatModalBody").appendChild($("#chat"));
+  chatModal.showModal();
+  var c=$("#chat");c.scrollTop=c.scrollHeight;
+};
+$("#chatModalClose").onclick=function(){chatModal.close()};
+chatModal.addEventListener("close",function(){$(".conversation").appendChild($("#chat"))});
+wireBackdropClose(chatModal,function(){chatModal.close()});
+/* The code window renders its own copy from model.code — review feedback can revise a
+   built tool while the window is open, so each render refreshes it, and a code file
+   that disappears closes it rather than leaving stale bytes on screen. */
+var codeModal=$("#codeModal"),codeModalId=null,codeModalText=null;
+function fillCodeModal(code){
+  codeModalText=code.text;
+  $("#codeModalFile").textContent=code.file;$("#codeModalLang").textContent=code.lang;
+  setHtml($("#codeModalBody"),html`<pre class="codeview">${codeHtml(code.text)}</pre>`);
+}
+function refreshCodeModal(){
+  if(!codeModal.open)return;
+  var code=model&&model.code.get(codeModalId);
+  if(!code)return codeModal.close();
+  if(code.text!==codeModalText)fillCodeModal(code);
+}
+document.addEventListener("click",function(e){
+  var x=e.target.closest("[data-code-expand]");
+  if(!x)return;
+  var code=model&&model.code.get(x.dataset.codeExpand);
+  if(!code)return;
+  codeModalId=x.dataset.codeExpand;
+  fillCodeModal(code);
+  codeModal.showModal();
+});
+$("#codeModalClose").onclick=function(){codeModal.close()};
+wireBackdropClose(codeModal,function(){codeModal.close()});
+function sendChatText(input){
+  var v=input.value.trim();
+  if(!v)return toast("Write a message first");
+  var p=model?model.phase:"boot";
+  send(p==="review"?"feedback":"comment",{suggestion:null,text:v},function(){
+    if(input.value.trim()===v)input.value="";
+    expectReply();
+  });
+}
+$("#chatModalSend").onclick=function(){sendChatText($("#chatModalInput"))};
+$("#convSend").onclick=function(){sendChatText($("#convInput"))};
+$("#convInput").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();sendChatText(this)}});
+$("#chatMinimize").onclick=function(){ui.chatMinimized=!ui.chatMinimized;renderChat()};
+$("#chatModalInput").addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChatText(this)}
+});
+/* Copy the message body — the source text, not the rendered markdown, because what you
+   paste elsewhere should be what the agent actually wrote. Delegated like every other
+   handler here: the CSP forbids inline onclick, and renderChat replaces these nodes on
+   every state push, so a bound listener would not survive anyway. The tick is a class
+   the next render drops on its own; the timer only has to undo it if nothing re-renders. */
+function clockTime(ts){
+  var d=new Date(ts);
+  return isNaN(d)?"":d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-copy]");
+  if(!b||!model)return;
+  var m=model.chat.concat(ui.chatLocal).find(function(x){return x.ts===b.dataset.copy});
+  if(!m)return;
+  navigator.clipboard.writeText(m.text).then(function(){
+    b.classList.add("copied");
+    setTimeout(function(){b.classList.remove("copied")},1400);
+  },function(){toast("Could not copy — clipboard permission denied")});
+});
+/* Message pills link back to the graph: hover highlights the node, click opens it. */
+document.addEventListener("click",function(e){
+  var x=e.target.closest("[data-goto]");
+  if(!x||!model||!model.byId.get(x.dataset.goto))return;
+  var opening=!active();ui.activeId=x.dataset.goto;render();
+  if(opening)animateDetailOpen();
+});
+document.addEventListener("mouseover",function(e){
+  var x=e.target.closest("[data-goto]");
+  if(!x)return;
+  var card=$('[data-suggestion="'+CSS.escape(x.dataset.goto)+'"]');
+  if(card)card.classList.add("hl");
+});
+document.addEventListener("mouseout",function(e){
+  if(e.target.closest("[data-goto]"))$$(".hl").forEach(function(n){n.classList.remove("hl")});
+});
+$("#railFlyoutInput").addEventListener("input",function(e){
+  if(ui.railMode==="note"&&model&&model.phase==="propose")ui.general=e.target.value; // kept locally until submit
+  updateRailCount();
+});
+$("#railFlyoutAction").onclick=function(){
+  var v=$("#railFlyoutInput").value,p=model?model.phase:"boot";
+  if(ui.railMode==="note"){
+    var had=ui.general.trim();
+    ui.general=v;
+    if(p==="propose"||p==="boot"){
+      if(v.trim())logLocal(null,"Added a note for the whole plan: \u201c"+v.trim()+"\u201d","note:plan");
+      else if(had)logLocal(null,"Removed the note for the whole plan","note:plan");
+      toast(v.trim()?"Note attached — it will be saved with the plan":"Note cleared");closeRail();return renderReview()}
+    sendGeneral(p==="review"?"feedback":"comment");
+    return closeRail();
+  }
+  if(!v.trim())return toast("Describe the tool or capability first");
+  ui.toolRequest=v;
+  sendToolRequest();
+};
+$$("[data-view]").forEach(function(b){b.onclick=function(){ui.view=b.dataset.view;renderTree()}});
+function setCanvasZoom(value){
+  var z=Math.max(.5,Math.min(1.5,Math.round(value*100)/100));
+  ui.canvasZoom=z;document.documentElement.style.setProperty("--canvas-zoom",String(z));
+  $("#zoomValue").textContent=Math.round(z*100)+"%";
+  $("#zoomOut").disabled=z<=.5;$("#zoomIn").disabled=z>=1.5;
+  requestAnimationFrame(renderLinks);
+}
+$("#zoomOut").onclick=function(){setCanvasZoom(ui.canvasZoom-.1)};
+$("#zoomIn").onclick=function(){setCanvasZoom(ui.canvasZoom+.1)};
+setCanvasZoom(ui.canvasZoom);
+/* Fit on first plan: keep the 75% default, zoom out further only if the map
+   overflows the canvas. Reset (zoom % click / double-click) returns here. */
+var fitZoom=.75,fitted=false;
+function fitCanvas(){
+  var map=$(".map"),scroll=$("#treeScroll");
+  if(!map||!map.offsetWidth||ui.view!=="map")return;
+  fitZoom=Math.max(.5,Math.min(.75,
+    Math.round(Math.min((scroll.clientWidth-56)/map.offsetWidth,(scroll.clientHeight-56)/map.offsetHeight)*100)/100));
+  setCanvasZoom(fitZoom);
+}
+function resetCanvas(){
+  ui.panX=0;ui.panY=0;
+  document.documentElement.style.setProperty("--canvas-pan-x","0px");
+  document.documentElement.style.setProperty("--canvas-pan-y","0px");
+  setCanvasZoom(fitZoom);
+}
+$("#zoomValue").onclick=resetCanvas;
+$(".detail").addEventListener("animationend",function(){this.classList.remove("entering")});
+// The canvas reflows while the panel's width animates; hide the connector
+// lines during the move and redraw them once layout settles.
+var canvas=$("#treeScroll"),panning=false,panStartX=0,panStartY=0,panOriginX=0,panOriginY=0;
+function stopPanning(e){
+  if(!panning)return;
+  panning=false;canvas.classList.remove("dragging");
+  if(Math.abs(ui.panX-panOriginX)+Math.abs(ui.panY-panOriginY)>6)lastTap=0; // a drag is not a tap
+  if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
+}
+var lastTap=0;
+canvas.addEventListener("pointerdown",function(e){
+  if(ui.view!=="map"||e.button!==0||e.target.closest("button,[data-suggestion],textarea,summary"))return;
+  // Pan's preventDefault suppresses native dblclick, so double-tap is detected here.
+  if(e.timeStamp-lastTap<350){lastTap=0;resetCanvas();return}
+  lastTap=e.timeStamp;
+  panning=true;panStartX=e.clientX;panStartY=e.clientY;panOriginX=ui.panX;panOriginY=ui.panY;
+  canvas.classList.add("dragging");canvas.setPointerCapture(e.pointerId);e.preventDefault();
+});
+canvas.addEventListener("pointermove",function(e){
+  if(!panning)return;
+  ui.panX=panOriginX+e.clientX-panStartX;ui.panY=panOriginY+e.clientY-panStartY;
+  document.documentElement.style.setProperty("--canvas-pan-x",ui.panX+"px");
+  document.documentElement.style.setProperty("--canvas-pan-y",ui.panY+"px");
+});
+canvas.addEventListener("pointerup",stopPanning);
+canvas.addEventListener("pointercancel",stopPanning);
+// macOS pinch arrives as a wheel event with ctrlKey set.
+canvas.addEventListener("wheel",function(e){
+  if(ui.view!=="map"||!e.ctrlKey)return;
+  e.preventDefault();
+  setCanvasZoom(ui.canvasZoom*(1-Math.max(-30,Math.min(30,e.deltaY))*.01));
+},{passive:false});
+$("#detailClose").onclick=function(){$(".detail").classList.remove("entering");ui.activeId=null;render()};
+$("#primaryAction").onclick=function(){
+  var p=model.phase;
+  if(p==="review")return approve();
+  if(p==="build"||p==="verify"||p==="done")return;
+  submitPlan();
+};
+$("#closeAgentStage").onclick=function(){$("#agentStage").close()};
+// Escape closes the dialog natively, so state syncs on the close event, not the button.
+$("#agentStage").addEventListener("close",function(){ui.stageClosed=true;renderStage()});
+$("#stageButton").onclick=function(){ui.stageClosed=false;renderStage()};
+$("#startConnect").onclick=function(){chooseConnect("connect")};
+$("#skipConnect").onclick=function(){chooseConnect("skip")};
+$("#connectClose").onclick=function(){ui.connectClosed=true;$("#connectStage").close();renderStage()};
+$("#connectStage").addEventListener("cancel",function(e){e.preventDefault()});
+
+function setTheme(theme){
+  document.documentElement.dataset.theme=theme;
+  $("#themeLabel").textContent=theme==="dark"?"Light":"Dark";
+  $("#themeButton").setAttribute("aria-label","Switch to "+(theme==="dark"?"light":"dark")+" mode");
+  try{localStorage.setItem("webmcp-explorer-theme",theme)}catch(e){}
+}
+setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
+$("#themeButton").onclick=function(){setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark")};
+
+/* ── Guided tour ─────────────────────────────────────────────────────────────── */
+var tourKey="webmcp-explorer-tour-seen",tourInvitePending=false,tourInviteOffered=false,tourInviteTimer=null;
+function markTourSeen(){tourInviteOffered=true;tourInvitePending=false;clearTimeout(tourInviteTimer);try{localStorage.setItem(tourKey,"1")}catch(e){}$("#tourInvite").classList.remove("show")}
+function maybeOfferTour(){
+  if(!model||!model.canonical.length){$("#tourInvite").classList.remove("show");return}
+  if(tourInvitePending||tourInviteOffered)return;
+  try{if(localStorage.getItem(tourKey)){tourInviteOffered=true;return}}catch(e){}
+  tourInvitePending=true;
+  tourInviteTimer=setTimeout(function(){
+    tourInvitePending=false;
+    if(!model||!model.canonical.length)return;
+    try{if(localStorage.getItem(tourKey)){tourInviteOffered=true;return}}catch(e){}
+    $("#tourInvite").classList.add("show");tourInviteOffered=true;
+  },500);
+}
+function runTour(){
+  if(!model||!model.canonical.length)return toast("The tour is available once the agent suggests a tool");
+  markTourSeen();
+  // The tour's detail stops need a selected tool and a visible detail pane.
+  // If the tour makes that selection itself, it undoes it when it ends.
+  var tourSelected=false;
+  if(!active()){ui.activeId=model.canonical[0].id;tourSelected=true}
+  ui.view="map";
+  render();
+  requestAnimationFrame(function(){
+    var factory=window.driver&&window.driver.js&&window.driver.js.driver;
+    if(!factory){
+      // The selection was only made for the tour — undo it if the tour cannot run.
+      if(tourSelected){ui.activeId=null;render()}
+      return toast("Tour is unavailable offline. Try again when connected.");
+    }
+    var details=$$("#content details"),openState=details.map(function(d){return d.open}),scrollState=content.scrollTop,restored=false,
+        dark=document.documentElement.dataset.theme==="dark";
+    function fitTourSection(current){
+      details.forEach(function(d){d.classList.toggle("tour-section",d===current)});
+      if(!current)return;
+      current.style.maxHeight=Math.max(220,content.clientHeight-18)+"px";
+      var box=content.getBoundingClientRect(),rect=current.getBoundingClientRect();
+      content.scrollTop+=rect.top-box.top;scrollBefore=content.scrollTop;
+    }
+    function restoreTourState(){
+      if(restored)return;
+      restored=true;
+      details.forEach(function(d,i){d.open=openState[i];d.classList.remove("tour-section");d.style.maxHeight=""});
+      if(tourSelected){ui.activeId=null;render();return}
+      setTimeout(function(){content.scrollTop=Math.min(scrollState,Math.max(0,content.scrollHeight-content.clientHeight))},50);
+    }
+    function expandedSection(selector){
+      return function(){
+        var current=$(selector);
+        if(!current)return undefined;
+        details.forEach(function(d){d.open=d===current});
+        fitTourSection(current);
+        return current;
+      };
+    }
+    var tour=factory({
+      showProgress:true,progressText:"{{current}} of {{total}}",nextBtnText:"Next",prevBtnText:"Back",doneBtnText:"Done",
+      popoverClass:"webmcp-tour",overlayColor:dark?"#010302":"#101612",overlayOpacity:dark?.82:.48,
+      onHighlightStarted:function(element){
+        var current=element&&element.closest&&element.closest("details");
+        if(!current)return fitTourSection(null);
+        details.forEach(function(d){d.open=d===current});
+        fitTourSection(current);
+      },
+      onDestroyStarted:function(element,step,options){restoreTourState();options.driver.destroy()},
+      onDestroyed:restoreTourState,
+      steps:[
+        {element:".review",popover:{title:"Talk to the agent",description:"The conversation is how you steer the build: ask questions, request changes, and read the agent's replies — live. Message pills jump to the tool they mention.",side:"right"}},
+        {element:".tree-panel",popover:{title:"The interactive plan",description:"Every tool the agent suggests for this site, live. The page follows the agent's state folder — it updates itself, there is nothing to refresh.",side:"right"}},
+        {element:"#tools .tool.active",popover:{title:"Pick a tool suggestion",description:"Select a suggestion to inspect it. Unpick the ones the agent should not build.",side:"right"}},
+        {element:expandedSection("#notePanel"),popover:{title:"Notes and questions",description:"Write a note on the selected suggestion — it stays here as you type and is saved when you submit the plan.",side:"left"}},
+        {element:".detail",popover:{title:"Inspect the suggestion",description:"Description, parameters, the generated code, and the agent's reasoning for this one tool.",side:"left"}},
+        {element:expandedSection("#parameters"),popover:{title:"Parameters",description:"The inputs the tool takes, and what each one means.",side:"left"}},
+        {element:expandedSection("#implementation"),popover:{title:"Generated code",description:"Read-only. The agent writes the tool code after you submit the plan; it lands here for review.",side:"left"}},
+        {element:expandedSection("#reasoning"),popover:{title:"Why this tool",description:"The user need this tool serves — the record that ships with the change.",side:"left"}},
+        {element:"#railNote",popover:{title:"Plan-wide note",description:"Add a note that spans the whole plan. Use Request tool on the canvas when a capability is missing.",side:"top"}},
+        {element:"#statusBox",popover:{title:"Status bar",description:"The one place that always says where the run is and what to do next.",side:"top"}},
+        {element:"#primaryAction",popover:{title:"Submit, then iterate",description:"Submitting starts the build. When the tools are ready you review the code, send feedback as many rounds as you need, and approve.",side:"top"}}
+      ]
+    });
+    tour.drive();
+  });
+}
+$("#tourButton").onclick=runTour;$("#startTour").onclick=runTour;$("#dismissTour").onclick=markTourSeen;
+
+/* ── Layout resizers (in-memory only) ────────────────────────────────────────── */
+document.documentElement.style.setProperty("--review-h",ui.reviewHeight+"px");
+var resizing=false,resizer=$("#reviewResizer");
+function resizeReview(x){ // side panel: drag sets the conversation column width
+  var w=Math.round(Math.max(300,Math.min(640,x)));
+  document.documentElement.style.setProperty("--conv-w",w+"px");
+}
+resizer.addEventListener("pointerdown",function(e){resizing=true;resizer.classList.add("dragging");$(".app").classList.add("conv-drag");resizer.setPointerCapture(e.pointerId);e.preventDefault()});
+resizer.addEventListener("pointermove",function(e){if(resizing)resizeReview(e.clientX)});
+resizer.addEventListener("pointerup",function(e){if(!resizing)return;resizing=false;resizer.classList.remove("dragging");$(".app").classList.remove("conv-drag");resizer.releasePointerCapture(e.pointerId);requestAnimationFrame(renderLinks)});
+
+var detailDragging=false,detailResizer=$("#detailResizer");
+function inspectorBounds(){var min=350,max=Math.max(min,Math.min(680,innerWidth-690));return{min:min,max:max}}
+function setInspectorWidth(width){
+  var bounds=inspectorBounds(),w=Math.round(Math.max(bounds.min,Math.min(bounds.max,width)));
+  ui.inspectorWidth=w;document.documentElement.style.setProperty("--detail-w",w+"px");
+  detailResizer.setAttribute("aria-valuemin",bounds.min);detailResizer.setAttribute("aria-valuemax",bounds.max);detailResizer.setAttribute("aria-valuenow",w);
+  requestAnimationFrame(renderLinks);
+}
+setInspectorWidth(ui.inspectorWidth);
+// The workspace column animates open/closed; connector endpoints are only
+// correct once the layout settles.
+detailResizer.addEventListener("pointerdown",function(e){detailDragging=true;detailResizer.classList.add("dragging");detailResizer.setPointerCapture(e.pointerId);document.body.style.cursor="col-resize";document.body.style.userSelect="none";e.preventDefault()});
+detailResizer.addEventListener("pointermove",function(e){if(!detailDragging)return;var box=$(".app").getBoundingClientRect();setInspectorWidth(box.right-e.clientX-18)});
+detailResizer.addEventListener("pointerup",function(e){if(!detailDragging)return;detailDragging=false;detailResizer.classList.remove("dragging");detailResizer.releasePointerCapture(e.pointerId);document.body.style.cursor="";document.body.style.userSelect=""});
+detailResizer.addEventListener("keydown",function(e){
+  if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight"&&e.key!=="Home"&&e.key!=="End")return;
+  var bounds=inspectorBounds(),step=e.shiftKey?40:16,
+      next=e.key==="Home"?bounds.min:e.key==="End"?bounds.max:ui.inspectorWidth+(e.key==="ArrowLeft"?step:-step);
+  setInspectorWidth(next);e.preventDefault();
+});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"){ui.stageClosed=true;renderStage();closeRail()}});
+window.addEventListener("resize",function(){resizeReview(innerHeight-ui.reviewHeight);setInspectorWidth(ui.inspectorWidth)});
+/* Links are geometry, so watch geometry — not the events that happen to change it.
+   Every redraw used to be scheduled by hand at a moment someone guessed the layout had
+   settled, and the collapse toggle guessed wrong: it drew on the next frame, ~16ms into
+   the 250ms `grid-template-columns` transition, so the paths froze at the old positions
+   while the nodes slid out from under them and only snapped back on the transitionend
+   handler below it. The .detail panel papered over the same race by hiding the links for
+   the length of its transition. A ResizeObserver fires on every frame the box actually
+   changes, so the links track the animation instead of jumping at either end of it, and
+   the drag-resize, the window resize and the breakpoint flips all come free.
+   Safe to redraw from inside the callback: #mapLinks is absolutely positioned, so
+   swapping its children cannot resize anything being observed. */
+new ResizeObserver(renderLinks).observe($(".map"));
+new ResizeObserver(renderLinks).observe($("#treeScroll"));
+
+model=normalize();
+render();
+connect();
+})();
+</script>
+</body>
+</html>
