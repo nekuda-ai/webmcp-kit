@@ -11,6 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 
 const source = readFileSync(
   join(import.meta.dir, "..", "skills", "implement", "interactive", "explorer.html"),
@@ -32,11 +33,11 @@ function liftVar(name: string): string {
 type Availability = { scope: string; where: string; when: string; note: string } | null;
 type Entry = { id: string; availability: Availability };
 
-const lifted = new Function(`
+const lifted = runInNewContext(`(() => {
   ${["SCOPE_KINDS", "SCOPE_ORDER"].map(liftVar).join("\n")}
   ${["safeStr", "normAvailability", "scopeKind", "scopeLabel", "scopeGroups"].map(lift).join("\n")}
   return { normAvailability, scopeGroups, scopeLabel };
-`)() as {
+})()`) as {
   normAvailability: (v: unknown) => Availability;
   scopeGroups: (list: Entry[]) => Array<{ kind: string; label: string; tools: Entry[] }>;
   scopeLabel: (s: Entry) => string;

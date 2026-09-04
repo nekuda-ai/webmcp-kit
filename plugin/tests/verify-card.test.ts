@@ -9,6 +9,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 
 const src = readFileSync(
   join(import.meta.dir, "..", "skills", "implement", "interactive", "explorer.html"),
@@ -28,10 +29,10 @@ type Folded = {
   steps: Map<string, Map<string, Step>>;
   runSteps: Map<string, { state: string }>;
 };
-const fold = new Function(`
+const fold = runInNewContext(`(() => {
   ${["safeStr", "foldStatus"].map(lift).join("\n")}
   return foldStatus
-`)() as (events: unknown[]) => Folded;
+})()`) as (events: unknown[]) => Folded;
 
 // One run, replayed the way normalize() replays _status.ndjson: two tools built and
 // statically checked (one clean, one not), then the developer approves.
