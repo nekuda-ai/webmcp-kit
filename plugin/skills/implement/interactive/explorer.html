@@ -12,7 +12,7 @@
      the page script: no inline handlers, no eval, nothing loadable but pinned driver.js.
      The two script hashes and the style hash cover this file's inline blocks —
      regenerate them if you edit any inline style or script block. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-H2PZefWdV9cbGszOn24X2sV28/4/Rm2qhm0lOc4x+o8=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-oA7Q/p0pkPC0dBhyyNpIbgmodhWPqTxM6q+yFgT/+Oo=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self'; img-src data:; style-src 'sha256-TUICanrZnZIlo3l4Q7Gmj+Fd8aOFJNMOKeh7yYpoDCg=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css; script-src 'sha256-eQ1xxaGIQaS/1vmvbtUVOfTblkPUHYy/bnat3cH3a5I=' 'sha256-oA7Q/p0pkPC0dBhyyNpIbgmodhWPqTxM6q+yFgT/+Oo=' https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css" integrity="sha384-XUGWln86d3kDvw/W1Qbii8QQyeWs2LcFYfGhYrmSZ0ZiXxowttKpfdhPdLE+WMFx" crossorigin="anonymous">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("webmcp-explorer-theme")||"light"}catch(e){}</script>
 <style>:root{--bg:#f6f7f6;--panel:#fff;--ink:#222624;--muted:#737975;--line:#dfe3e0;--blue:#279cff;--blue-bg:#eef8ff;--green:#41865f;--green-bg:#eef6f1;--gold:#987627;--gold-bg:#fbf6e8;--red:#b55545;--red-bg:#fff1ee;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
@@ -505,7 +505,7 @@ pre.codeview{width:100%;min-width:0;min-height:360px;margin:0;padding:15px;overf
 .tool.dupe{opacity:.6;cursor:default}
 .dupe-badge{margin-left:auto;padding:3px 7px;border-radius:99px;background:var(--red-bg);color:var(--red);font:700 8px var(--mono);letter-spacing:.05em;text-transform:uppercase}
 .extra-file button{margin-top:6px}
-/* NEK-711: readable laptop scale and a review-first first-run hierarchy. */
+/* Readable laptop scale and a review-first first-run hierarchy. */
 :root{--review-h:250px;--canvas-zoom:.75}
 body{font-size:18px}
 .app{grid-template-rows:minmax(96px,auto) minmax(0,1fr) var(--review-h)}

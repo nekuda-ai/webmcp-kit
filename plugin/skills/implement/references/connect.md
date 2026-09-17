@@ -20,8 +20,8 @@ override. Set `WEBMCP_API_BASE` to the environment's API; everything else follow
 plugin-root invocation when targeting an isolated dev or preview environment, for example:
 
 ```sh
-WEBMCP_API_BASE=https://api-pr-332.pr.agentlane.dev \
-WEBMCP_CONFIG_DIR=/tmp/webmcp-pr-332 \
+WEBMCP_API_BASE=https://api.preview.example.com \
+WEBMCP_CONFIG_DIR=/tmp/webmcp-preview \
 "${CLAUDE_PLUGIN_ROOT}/scripts/webmcp.sh" status --workspace <workspace> --json
 ```
 
@@ -36,7 +36,7 @@ WEBMCP_CONFIG_DIR=/tmp/webmcp-pr-332 \
    - `Skip for now`
    - success: `Connected — N tools ready`
 
-   In a chat-only run, do not create Explorer state or journals. Present the same explanation followed by the two choices `Connect to AgentLane` and `Skip for now`, then end the turn and wait for the developer's explicit choice. Treat that reply and the exact entry-module path in the approved Phase-D plan as the decision record below; never infer either from silence or search for a replacement path.
+   In a chat-only run, do not create Explorer state or journals. Present the same explanation and put the two choices `Connect to AgentLane` and `Skip for now` to the developer per `references/decisions.md`, then wait for the developer's explicit choice. Treat that reply and the exact entry-module path in the approved Phase-D plan as the decision record below; never infer either from silence or search for a replacement path.
 
 When the Explorer is active, the browser sends a durable `connect` event with payload `{"action":"connect"}` or `{"action":"skip"}`. Handle and acknowledge it by the normal journal rules in `references/interactive.md`. A chat-only reply has no browser event to acknowledge; the conversation is its approval record.
 
@@ -57,3 +57,68 @@ For `{"action":"skip"}` or the equivalent chat reply, append `{"ts":"<now>","run
 7. On success append `{"ts":"<now>","run":"connect","state":"done"}` only when Explorer state exists, then acknowledge an Explorer event when one exists. Continue docs/PR work. The Explorer derives `N` from the approved built suggestions; chat-only reports the verified count in the conversation.
 
 Connection state written by the CLI is not the source seam. On every skip or failure the entry module must be byte-for-byte unchanged; the tool modules are never candidates for rollback.
+
+## Publish the tool catalog (offered once the connection is healthy)
+
+Publishing is the second optional decision, offered only after Connect has finished healthy — a
+skipped or failed connection ends the run here, with the built tools unchanged. It sends the tool
+descriptions the developer already approved (durable key, wire name, description, input schema,
+annotations) so the tools appear in AgentLane's catalog instead of only showing up once something
+calls them. Disclose all three facts when you offer it, in your own words:
+
+- The approved **descriptions** of the tools are sent.
+- The **source code is not** — no handler bodies, no endpoints, no file contents. The CLI reads the
+  `defineTool` calls out of the entry module's text and never runs it.
+- No **credential** is sent. The connection's publishable key stays at the seam; publishing uses
+  the login the developer already authorized.
+
+Present it as a choice with the same wording rules as Connect above (no *mint*, *token*, *scope*,
+*telemetry*, *API key*, or *origin*, and never echo CLI fields or error prose). Suggested
+explanation: `Publish these tool descriptions so they show up in AgentLane before anyone uses them.
+Your code stays in this project.` Offer `Publish tool descriptions` and `Skip for now` per
+`references/decisions.md`. A
+non-interactive or headless run skips it, exactly as Connect does.
+
+On approval, run the current host's plugin-root entry with:
+
+```sh
+"${CLAUDE_PLUGIN_ROOT}/scripts/webmcp.sh" publish --workspace <workspace> \
+  --entry <the approved entry module, relative> --scope <registration-scope-name> --yes --json
+```
+
+Rules for that invocation:
+
+1. `--entry` is the exact approved entry module from the decision record — the same path Connect
+   edited, never a file found by searching. One run covers one entry module; a workspace with a
+   second registration scope runs `publish` again for it.
+2. `--scope` names the registration scope durably and is **never a filesystem path**: a project
+   that moves `src/tools/` to `app/tools/` must keep publishing as the same author. Pass it only on
+   the first publish — the CLI records it in `.webmcp/connect.json` and reuses it verbatim
+   afterwards, and refuses a different one rather than quietly creating a second author. Derive the
+   first value from the connection's `display_name`, reduced to `[A-Za-z0-9._-]`.
+3. `--yes` is required for an agent-driven run: without it the CLI refuses to publish when there is
+   nobody at a terminal to confirm. Never pass it before the developer has approved.
+4. Parse stdout as JSON. `status: "published"` is success; report the number of `entries`.
+   `status: "skipped"` means nothing was sent.
+5. Failures are not fatal to the run. `publisher_scope_required`, `publisher_scope_mismatch`,
+   `key_owned_elsewhere` and `dynamic_tool_definition` all leave the built tools and the connection
+   untouched — say only that the descriptions were not published and the developer may retry, then
+   continue docs/PR work. `dynamic_tool_definition` is the one worth acting on: it names a tool
+   whose definition is assembled at runtime, which is a tool no catalog can describe without
+   running the project's code.
+
+Publishing writes nothing to the developer's source. On any outcome the entry module must be
+byte-for-byte what Connect left.
+
+## Hand over the dashboard (after the publish decision, whichever way it went)
+
+A healthy connection ends with the one link that shows the developer what they just did. Take
+`dashboard_url` verbatim from the Connect result (or `.webmcp/connect.json`); it lands on this
+project and this deployment, and the dashboard greets a first connection with the tools it found.
+Say, in your own words:
+
+`You're connected. Watch your tools and every call to them in AgentLane: <dashboard_url>`
+
+One line, once per run — a site with several registration scopes shares one link. Print it
+before the docs/PR work so it is not buried under the PR summary, and repeat it in the closing
+summary. A skipped or failed connection has no link to give; say nothing about the dashboard.

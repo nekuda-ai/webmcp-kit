@@ -30,6 +30,7 @@ const VERSION = 1;
 const ACTIONABLE = new Set(["comment", "submit", "feedback", "approve", "cancel", "connect"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_INPUT_BYTES = 256 * 1024;
+const INPUT_TIMEOUT_MS = 1_000;
 const MAX_RUN_BYTES = 16 * 1024;
 const MAX_HEALTH_BYTES = 64 * 1024;
 const MAX_STATE_BYTES = 16 * 1024;
@@ -260,6 +261,12 @@ async function readHookInput(): Promise<HookInput | null> {
   const chunks: Buffer[] = [];
   let total = 0;
   const reader = Bun.stdin.stream().getReader();
+  let timedOut = false;
+  // Bound the whole input, not each chunk; cancellation closes the pending read.
+  const timer = setTimeout(() => {
+    timedOut = true;
+    void reader.cancel().catch(() => {});
+  }, INPUT_TIMEOUT_MS);
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -274,8 +281,10 @@ async function readHookInput(): Promise<HookInput | null> {
   } catch {
     return null;
   } finally {
+    clearTimeout(timer);
     reader.releaseLock();
   }
+  if (timedOut) return null;
   const data = Buffer.concat(chunks, total);
   let value: unknown;
   try {
@@ -639,7 +648,7 @@ function pluginStateBase(): string {
     throw new UnsafeState("PLUGIN_DATA must be an absolute path");
   }
   // Released Codex (<= 0.148.0) points PLUGIN_DATA at a directory it never
-  // creates (NEK-779), so create-then-verify — the same discipline as the
+  // creates, so create-then-verify — the same discipline as the
   // versioned state dir below. A symlink or non-directory still fails closed:
   // mkdir errors are ignored only because isRealDirectory re-checks the result.
   if (!isRealDirectory(pluginData)) {
@@ -764,7 +773,10 @@ class PortableLock {
           }
         }
       } catch {}
-      if (pathExists(this.path)) return false;
+      // Losing the canonical name is contention, not corruption: the winner may
+      // already have released it by the time this process looks for it.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (pathExists(this.path) || code === "ENOTEMPTY" || code === "EEXIST") return false;
       throw new UnsafeState("could not create private lock");
     }
   }
@@ -781,7 +793,20 @@ class PortableLock {
 
   acquire(): void {
     if (this.tryCreate()) return;
-    if (!isRealDirectory(this.path)) throw new UnsafeState("private lock path is unsafe");
+    // One stat, because the holder this process just lost to may release the
+    // lock at any moment: a vanished lock is contention, not an unsafe path.
+    let existing: Stats;
+    try {
+      existing = lstatSync(this.path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new LockBusy("private lock was released while being observed");
+      }
+      throw new UnsafeState("private lock path is unsafe");
+    }
+    if (!existing.isDirectory() || existing.isSymbolicLink()) {
+      throw new UnsafeState("private lock path is unsafe");
+    }
     const owner = this.readOwner();
     const maxAge = envMs(
       "WEBMCP_HOOK_LOCK_MAX_AGE_MS",

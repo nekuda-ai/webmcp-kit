@@ -1,6 +1,6 @@
 # Plan template (R2 — the key interaction)
 
-Present this in the selected review surface **before any file is touched**. Not committed to the customer repo by default; it becomes the PR body after approval. The approval gate is hard: edits → revise → re-present → proceed only on explicit "approve". No answer → stop unless the run is explicitly non-interactive. Each tool's `Description` line ships **verbatim** into the code, because description is the product.
+Present this in the selected review surface **before any file is touched**. Not committed to the customer repo by default; it becomes the PR body after approval. The approval gate is hard: edits → revise → re-present → proceed only on explicit approval, collected per `references/decisions.md`. No answer → stop unless the run is explicitly non-interactive. Each tool's `Description` line ships **verbatim** into the code, because description is the product.
 
 The per-tool block below extends the base skeleton with `Annotations` and `Confirmation` lines so classifications and write boundaries are reviewed in the plan, not chosen silently at codegen time.
 
@@ -34,5 +34,5 @@ entry module: <one workspace-relative path selected during wiring>
 ## After approval
 branch → code → verify (each tool ends verified / failed / could-not-verify) → PR
 
-Human run: reply approve, or edit anything above — nothing is written until you do. Explicit non-interactive run: proceed on the stated defaults above; each becomes a recorded assumption (see Degrade paths).
+Human run: nothing is written until you approve — the approval prompt follows; any edit to the above re-presents the plan. Explicit non-interactive run: proceed on the stated defaults above; each becomes a recorded assumption (see Degrade paths).
 ```

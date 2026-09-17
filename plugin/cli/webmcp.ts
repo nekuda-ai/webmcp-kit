@@ -3,12 +3,14 @@
 import { type ConnectOptions, connect } from "./connect";
 import { browserMain } from "./browser";
 import { CliError, type LoginOptions, login } from "./login";
+import { type PublishOptions, publish } from "./publish";
 import { status } from "./status";
 
 const USAGE = `Usage:
   webmcp login [--json]
   webmcp connect --workspace <dir> [--site-url <url>] [--environment <name>] [--org <id>] [--json]
   webmcp status --workspace <dir> [--json]
+  webmcp publish --workspace <dir> --entry <file> [--scope <name>] [--environment <name>] [--yes] [--json]
   webmcp browser <command> [...args]`;
 
 type Io = {
@@ -17,7 +19,8 @@ type Io = {
 };
 
 export type MainOptions = LoginOptions &
-  Pick<ConnectOptions, "retryDelayMs" | "maxAttempts" | "sleep" | "projectKey"> & {
+  Pick<ConnectOptions, "retryDelayMs" | "maxAttempts" | "sleep" | "projectKey"> &
+  Pick<PublishOptions, "interactive" | "confirm"> & {
     io?: Io;
   };
 
@@ -25,6 +28,7 @@ type Parsed = {
   command: string | null;
   json: boolean;
   help: boolean;
+  yes: boolean;
   values: Record<string, string>;
   invalid: boolean;
 };
@@ -34,13 +38,22 @@ function parseArgs(args: string[]): Parsed {
     command: null,
     json: false,
     help: false,
+    yes: false,
     values: {},
     invalid: false,
   };
-  const valueOptions = new Set(["--workspace", "--site-url", "--environment", "--org"]);
+  const valueOptions = new Set([
+    "--workspace",
+    "--site-url",
+    "--environment",
+    "--org",
+    "--entry",
+    "--scope",
+  ]);
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index] ?? "";
     if (arg === "--json") parsed.json = true;
+    else if (arg === "--yes") parsed.yes = true;
     else if (arg === "--help" || arg === "-h") parsed.help = true;
     else if (valueOptions.has(arg)) {
       const value = args[index + 1];
@@ -73,17 +86,21 @@ export async function main(args: string[], options: MainOptions = {}): Promise<n
       ? new Set(["--workspace", "--site-url", "--environment", "--org"])
       : parsed.command === "status"
         ? new Set(["--workspace"])
-        : new Set<string>();
+        : parsed.command === "publish"
+          ? new Set(["--workspace", "--entry", "--scope", "--environment", "--org"])
+          : new Set<string>();
   const unsupportedValue = Object.keys(parsed.values).some((key) => !allowedValues.has(key));
-  const requiresWorkspace = parsed.command === "connect" || parsed.command === "status";
+  const commands = ["login", "connect", "status", "publish"];
+  const requiresWorkspace = parsed.command !== "login";
   if (
     parsed.invalid ||
     unsupportedValue ||
-    !["login", "connect", "status"].includes(parsed.command ?? "") ||
-    (requiresWorkspace && !parsed.values["--workspace"])
+    !commands.includes(parsed.command ?? "") ||
+    (requiresWorkspace && !parsed.values["--workspace"]) ||
+    (parsed.command === "publish" && !parsed.values["--entry"])
   ) {
     const message =
-      parsed.command && !["login", "connect", "status"].includes(parsed.command)
+      parsed.command && !commands.includes(parsed.command)
         ? `Unknown command: ${parsed.command}`
         : USAGE;
     if (parsed.json) io.stdout(JSON.stringify({ ok: false, error: { code: "usage", message } }));
@@ -134,6 +151,31 @@ export async function main(args: string[], options: MainOptions = {}): Promise<n
       }
       if (result.status === "connected") return 0;
       return result.edge_verification === "disabled" ? 1 : 3;
+    }
+
+    if (parsed.command === "publish") {
+      const result = await publish({
+        ...options,
+        workspace: parsed.values["--workspace"] as string,
+        entry: parsed.values["--entry"] as string,
+        scope: parsed.values["--scope"],
+        environment: parsed.values["--environment"],
+        org: parsed.values["--org"],
+        yes: parsed.yes,
+      });
+      if (parsed.json) io.stdout(JSON.stringify({ ok: true, command: "publish", ...result }));
+      else if (result.status === "published") {
+        io.stdout(
+          `Published ${result.entries.length} tool${result.entries.length === 1 ? "" : "s"} as "${result.publisher_scope}" (${result.environment}).`,
+        );
+      } else {
+        io.stderr(
+          result.reason === "declined"
+            ? "Nothing was published; the tools in this workspace are unchanged."
+            : "Publishing needs confirmation; re-run with --yes to publish without a prompt.",
+        );
+      }
+      return 0;
     }
 
     const result = await status({

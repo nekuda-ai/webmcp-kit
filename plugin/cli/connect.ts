@@ -33,7 +33,17 @@ export type ConnectFile = {
   key_id: string;
   dashboard_url: string;
   ingest_url?: string;
+  /**
+   * The durable registration scope `webmcp publish` declares this workspace's tools under.
+   * Written once, by the first publish, and never derived from a filesystem
+   * path: a merchant who moves `src/tools/` to `app/tools/` must not become a second
+   * publisher whose declarations collide with its own.
+   */
+  publisher_scope?: string;
 };
+
+/** A registration scope as the publisher plane accepts it in a path segment. */
+export const PUBLISHER_SCOPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 export type TokenIdentity = {
   account: string;
@@ -216,16 +226,23 @@ export async function readConnectFile(workspace: string): Promise<ConnectFile | 
         return null;
       }
     }
+    // A malformed scope is dropped rather than failing the whole read: it was never a
+    // usable scope, and nulling the connection here would report a connected workspace as
+    // unconnected. `publish` then refuses to guess one, which is the safe half of this.
+    const scope = value.publisher_scope;
+    const publisherScope =
+      typeof scope === "string" && PUBLISHER_SCOPE_PATTERN.test(scope) ? scope : undefined;
     return {
       ...(Object.fromEntries(fields.map((field) => [field, value[field]])) as ConnectFile),
       ...(typeof ingestUrl === "string" ? { ingest_url: ingestUrl } : {}),
+      ...(publisherScope ? { publisher_scope: publisherScope } : {}),
     };
   } catch {
     return null;
   }
 }
 
-async function writeConnectFile(workspace: string, value: ConnectFile): Promise<string> {
+export async function writeConnectFile(workspace: string, value: ConnectFile): Promise<string> {
   const path = connectFilePath(workspace);
   // Atomically: a truncated connect.json reads back as null, which reports the
   // workspace as not connected and loses the saved Domain binding.
@@ -233,7 +250,7 @@ async function writeConnectFile(workspace: string, value: ConnectFile): Promise<
   return path;
 }
 
-async function apiJson(
+export async function apiJson(
   url: string,
   credentials: StoredCredentials,
   init: RequestInit,
@@ -265,13 +282,14 @@ async function apiJson(
     throw new CliError(
       code ?? "api_error",
       message ?? `WebMCP API request failed (${response.status})`,
+      error?.details,
     );
   }
   return body;
 }
 
-async function authenticated(
-  options: ConnectOptions,
+export async function authenticated(
+  options: LoginOptions & { org?: string },
   store: CredentialStore,
   forceConsent = false,
 ): Promise<{ credentials: StoredCredentials; identity: TokenIdentity; ingestUrl?: string }> {

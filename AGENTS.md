@@ -36,11 +36,17 @@ it did before.
 
 ## Facts worth carrying
 
-- **Local only.** The plugin never sends the user's code, routes, or schemas to
-  any external or hosted service. There is no hosted scanner; the tool-selection
-  logic is the skill's own text.
+- **Local only.** The plugin never sends the user's code to any external or
+  hosted service. There is no hosted scanner; the tool-selection logic is the
+  skill's own text. One narrow, opt-in exception: after a connection is set up,
+  the user may choose to publish the tool **descriptions** they already approved
+  — name, description, input schema — so the tools appear in their catalog. That
+  is a separate approval, it sends no handler body and no credential, and
+  declining it changes nothing about the tools.
 - **Nothing of the user's is written before approval** in a human-facing run. The
-  plan is the gate. Each skill names its own narrow exceptions inline — agent
+  plan is the gate. On Claude Code that approval, and every other chat-only
+  decision, is collected with the `AskUserQuestion` picker; other hosts print
+  the choices and wait (`skills/implement/references/decisions.md`). Each skill names its own narrow exceptions inline — agent
   state under `.webmcp/`, a read-only baseline capture — and they never include
   the user's source, a dependency, a branch, or Connect.
 - **Generated tools use the app's own client-reachable paths** — never

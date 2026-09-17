@@ -10,6 +10,7 @@ import {
   tokenIdentity,
 } from "./connect";
 import { CliError, apiBaseFor, type LoginOptions } from "./login";
+import { callAt, structuralMask, topLevelArguments, withoutComments } from "./source-scan";
 
 const SOURCE_EXTENSIONS = new Set([
   ".js",
@@ -90,43 +91,6 @@ function extension(path: string): string {
   return match?.[0]?.toLowerCase() ?? "";
 }
 
-/** Remove comments without damaging quoted strings; enough to keep examples from becoming facts. */
-function withoutComments(source: string): string {
-  let output = "";
-  let quote: "'" | '"' | "`" | null = null;
-  let escaped = false;
-  for (let i = 0; i < source.length; i += 1) {
-    const char = source[i] ?? "";
-    const next = source[i + 1] ?? "";
-    if (quote) {
-      output += char;
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === quote) quote = null;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === "`") {
-      quote = char;
-      output += char;
-      continue;
-    }
-    if (char === "/" && next === "/") {
-      while (i < source.length && source[i] !== "\n") i += 1;
-      output += "\n";
-      continue;
-    }
-    if (char === "/" && next === "*") {
-      i += 2;
-      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
-      i += 1;
-      output += " ";
-      continue;
-    }
-    output += char;
-  }
-  return output;
-}
-
 function trackingObjectAt(source: string, start: number): { body: string; end: number } | null {
   let depth = 0;
   let quote: "'" | '"' | "`" | null = null;
@@ -146,26 +110,6 @@ function trackingObjectAt(source: string, start: number): { body: string; end: n
     }
   }
   return null;
-}
-
-/** Keep structural punctuation and identifiers while hiding quoted example text. */
-function structuralMask(source: string): string {
-  let output = "";
-  let quote: "'" | '"' | "`" | null = null;
-  let escaped = false;
-  for (let i = 0; i < source.length; i += 1) {
-    const char = source[i] ?? "";
-    if (quote) {
-      output += " ";
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === quote) quote = null;
-    } else if (char === "'" || char === '"' || char === "`") {
-      quote = char;
-      output += " ";
-    } else output += char;
-  }
-  return output;
 }
 
 /** Read only a direct `tracking: { ... }` property from an object-literal options arg. */
@@ -192,53 +136,6 @@ function topLevelTrackingObject(options: string): string | null {
     return trackingObjectAt(options, brace)?.body ?? null;
   }
   return null;
-}
-
-function callAt(source: string, start: number): { body: string; end: number } | null {
-  let parentheses = 0;
-  let quote: "'" | '"' | "`" | null = null;
-  let escaped = false;
-  for (let i = start; i < source.length; i += 1) {
-    const char = source[i] ?? "";
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === quote) quote = null;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === "`") quote = char;
-    else if (char === "(") parentheses += 1;
-    else if (char === ")" && --parentheses === 0) {
-      return { body: source.slice(start + 1, i), end: i + 1 };
-    }
-  }
-  return null;
-}
-
-function topLevelArguments(body: string): string[] {
-  const parts: string[] = [];
-  let start = 0;
-  let depth = 0;
-  let quote: "'" | '"' | "`" | null = null;
-  let escaped = false;
-  for (let i = 0; i < body.length; i += 1) {
-    const char = body[i] ?? "";
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === quote) quote = null;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === "`") quote = char;
-    else if (char === "(" || char === "[" || char === "{") depth += 1;
-    else if (char === ")" || char === "]" || char === "}") depth -= 1;
-    else if (char === "," && depth === 0) {
-      parts.push(body.slice(start, i));
-      start = i + 1;
-    }
-  }
-  parts.push(body.slice(start));
-  return parts;
 }
 
 function registrationBatches(source: string): BatchFact[] {

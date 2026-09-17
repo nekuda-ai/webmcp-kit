@@ -36,6 +36,12 @@ export class CliError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    /**
+     * The API's structured `error.details`, when it sent any. Carried so a caller can act
+     * on a refusal rather than re-parse its prose — `key_owned_elsewhere` names the owning
+     * scope there, and that name is the merchant's whole next move.
+     */
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "CliError";
@@ -228,6 +234,21 @@ async function requestTokens(
   };
 }
 
+/**
+ * The `next` value the dashboard's `/connect/start` reads: the authorize URL as base64url.
+ *
+ * A signed-out developer goes through Clerk's sign-in round trip before `/connect/start`
+ * runs, and that hop decodes the return URL's query one time too many. A percent-encoded
+ * authorize URL then splits on its own `&`: `client_id`, `redirect_uri`, `scope`, `state`
+ * become stray parameters of `/connect/start`, and Clerk receives `?response_type=code`
+ * alone ("client does not exist"). base64url carries none of `&`, `%`, `+`, `=`, `/`, so
+ * no number of decode passes can change it. The receiver decodes the same base64url
+ * value back to the complete authorize URL.
+ */
+export function connectStartNext(authorizeUrl: string): string {
+  return Buffer.from(authorizeUrl).toString("base64url");
+}
+
 async function defaultOpenBrowser(url: string): Promise<boolean> {
   const override = process.env.WEBMCP_BROWSER?.trim();
   const command = override
@@ -329,7 +350,7 @@ async function authorizationCode(
   if (options.forceConsent) authorizeParams.set("prompt", "consent");
   authorize.search = authorizeParams.toString();
   const connectStart = new URL(config.connect_start_url);
-  connectStart.searchParams.set("next", authorize.toString());
+  connectStart.searchParams.set("next", connectStartNext(authorize.toString()));
   const authorizationUrl = connectStart.toString();
   options.showAuthorizationUrl?.(authorizationUrl);
   await (options.openBrowser ?? defaultOpenBrowser)(authorizationUrl).catch(() => false);

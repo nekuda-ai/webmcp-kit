@@ -64,7 +64,8 @@ in Phase C, before anything is written.
 
 ## Decision prompts
 
-Each of these is presented in the Phase-C plan with the specific question and a stated default. In a
+Each of these is presented in the Phase-C plan with the specific question and a stated default, and
+put to the developer per the `implement` skill's `references/decisions.md`, default first. In a
 `--non-interactive` run the stated default is taken and recorded in the report; it is never taken
 silently in an interactive one.
 

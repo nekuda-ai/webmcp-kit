@@ -1,6 +1,6 @@
 {
   "name": "webmcp-kit",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement the tools, and verify them in a browser — or connect the tools a site already has, without rebuilding them.",
   "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
   "homepage": "https://github.com/nekuda-ai/webmcp-kit",

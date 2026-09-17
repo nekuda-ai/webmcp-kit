@@ -16,7 +16,7 @@ Phase D is reviewed live in the Explorer instead of in chat. The state folder `<
 
 ## Startup
 
-0. Quietly run `command -v bun`. If missing, offer **install Bun** and browser review, or **review in chat** with `--no-interactive-loop`. Install only with consent. Missing Bun never implies `--non-interactive`.
+0. Quietly run `command -v bun`. If missing, offer **install Bun** and browser review, or **review in chat** with `--no-interactive-loop`, collected per `references/decisions.md`. Install only with consent. Missing Bun never implies `--non-interactive`.
 1. Start `bun <this skill's dir>/interactive/server.ts <workspace>` as a background task whose stdout remains readable. Do not add `--resume` for a new run: a normal start rotates run identity.
 2. Use the complete Explorer URL printed by that process. It includes `/?capability=...&run_id=...`; do not rebuild it from a remembered port. Open that URL unless a robot/headless client is driving.
 3. Treat the matching `.run.json` as the endpoint record. Health and shutdown are run-aware: `/healthz?capability=<capability>&run_id=<run_id>` and `/shutdown?capability=<capability>&run_id=<run_id>`.
@@ -49,7 +49,7 @@ For `approve`, durably set shipped suggestions to `approved` and append phase `v
 ## Rules and recovery
 
 - A `comment` beginning `Tool request:` asks for a capability. During propose, add/revise its suggestion. After submit, add it as proposed and require explicit go before building.
-- `.webmcp/` plan/review state is the ADR-0003 carve-out from "nothing before approval". Tool modules, dependencies, and branches remain gated on submit.
+- `.webmcp/` plan/review state is the exception to "nothing before approval". Tool modules, dependencies, and branches remain gated on submit.
 - **Resume in the same agent task/session:** read and validate `.run.json`, call the run-aware health URL, and reprint its capability/run URL when live. If the recorded process is dead, start `bun <this skill's dir>/interactive/server.ts <workspace> --resume`, use its new stdout URL/metadata, restore that task's wake path, then scan valid unacked events in order and continue from durable state. If `.run.json` is absent or invalid, there is no identity the server can safely resume; report that and rotate only when the developer asks for a new run. Use `--resume` only for same-task crashed-server recovery.
 - **Continue from a fresh agent task/session:** first read the old journals and reconcile valid current unacked events manually in numeric `order`; the old automatic hook binding does not transfer. Manual reconciliation may finish the old run. If the developer instead wants continued automatic browser interaction, explicitly rotate: cleanly call the run-aware shutdown endpoint when the old server is live, or abandon its dead runtime metadata when it is not, then start `bun <this skill's dir>/interactive/server.ts <workspace>` without `--resume`. Use only the new printed URL/run metadata and establish the new task's own wake path. Never describe this as resuming or transferring the old hook session.
 - **Teardown:** after Done, stop a Claude Monitor if one exists, POST the run-aware shutdown URL, and confirm the recorded port no longer listens. Codex hooks are plugin lifecycle hooks, not per-run background jobs to disable. A clean shutdown clears runtime liveness; journals remain as the review trail.

@@ -86,16 +86,21 @@ function parseCredentials(value: string): StoredCredentials | null {
 
 async function runCommand(command: string[], stdin?: string): Promise<CommandResult | null> {
   try {
-    const process = Bun.spawn(command, {
+    const child = Bun.spawn(command, {
       stdin: stdin === undefined ? "ignore" : "pipe",
       stdout: "pipe",
       stderr: "ignore",
     });
     if (stdin !== undefined) {
-      process.stdin.write(stdin);
-      process.stdin.end();
+      // `stdin: "pipe"` is what makes this writer exist, so a missing one is not a state to
+      // carry on in: this is the path a credential travels, and skipping the write would
+      // hand `security -i` an empty script and record a helper that "succeeded".
+      const writer = child.stdin;
+      if (!writer) throw new Error("stdin pipe unavailable");
+      writer.write(stdin);
+      writer.end();
     }
-    const [code, stdout] = await Promise.all([process.exited, new Response(process.stdout).text()]);
+    const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
     return { code, stdout };
   } catch {
     return null;
