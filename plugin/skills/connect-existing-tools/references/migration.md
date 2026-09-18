@@ -9,6 +9,7 @@ Goal: the same tools, registered through `@nekuda/webmcp-sdk`, behaving identica
   so omitting it silently renames the tool for every agent that already calls it.
 - `stableKey` follows `stable-keys.md`. An existing one is immutable.
 - `source: "merchant_authored"` on adopted definitions.
+- Every `registerTools` batch this skill writes passes `{ tracking: { builtWith: "webmcp-kit/connect-existing-tools@<version>" } }`, `<version>` replaced by this plugin's manifest version (read whichever host manifest ships beside these skills: `.claude-plugin/plugin.json`, else `.codex-plugin/plugin.json`) — the same rule as `implement`'s `references/codegen.md`, with this skill's name in the stamp so a migrated site and a generated one stay distinguishable. It is how the platform tells a site the Kit migrated from one a developer wired by hand; a batch without it is invisible as Kit work.
 - Registration moves into `registerTools` batches at the entry-module seam — one entry module per
   registration scope, exactly as the `implement` skill's two-module shape describes.
 - A duplicate `name` or `stableKey` within a batch is a hard SDK error. Resolve it with the
@@ -111,7 +112,7 @@ import { addToCart } from "../agent/tools";
 export function WebmcpProvider({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     if (!signedIn) return;                       // the SAME gate the native call had
-    const reg = registerTools([addToCart]);
+    const reg = registerTools([addToCart], { tracking: { builtWith: "webmcp-kit/connect-existing-tools@<version>" } });
     return () => reg.unregister();
   }, [signedIn]);
   return null;
@@ -149,7 +150,8 @@ a correct outcome, not a failed one.
 Connect is not re-specified here. It defers to the `implement` skill's
 `references/connect.md` — login, provisioning, the readiness gate, the entry-module seam edit, and
 the rule that a non-interactive run skips it. Read that file, and follow it as written, with the
-one multi-scope amendment stated below.
+one multi-scope amendment stated below — and pass `--skill connect-existing-tools` where its step 2
+says `--skill implement`, so the platform's Connect record names this skill.
 
 Two things it assumes, which this skill must have already done: every migrated tool is registered
 through `registerTools` (Connect writes `tracking` into *existing* batches — it never creates one),

@@ -12,6 +12,7 @@ Side-effect-free: validates eagerly and throws `TypeError` at module load on a b
 | `stableKey` | yes | Durable identity, dot-namespaced `domain.action` (`cart.add`). **Authored once, never changed on re-runs** — the platform keys on it later; reuse any `stableKey` inventoried in Phase A rather than minting a new one for the same tool. `name` may change freely; this may not. Never sent to the browser. |
 | `name` | yes | WebMCP wire name, 1–128 chars of `[A-Za-z0-9_.-]`, snake_case verb phrase, unique across the site. |
 | `title` | no | Human-readable display name. |
+| `source` | yes | Always `"merchant_authored"`. Telemetry provenance: it is what separates a tool that lives in the site's own code (this plugin, or a developer by hand) from one the hosted snippet built off a manifest (`scanner_generated`). Never omit it and never write `scanner_generated`. |
 | `description` | yes, non-empty | The product — the agent picks by name + description. Ships **verbatim** from the approved plan. Also state any consequence ("places an order"). |
 | `inputSchema` | no | Plain JSON Schema object: `{ type: "object", properties, required, additionalProperties: false }`. |
 | `annotations` | no | `{ readOnlyHint?, untrustedContentHint? }`. Pure reads → `readOnlyHint: true`. User/third-party content → `untrustedContentHint: true`. No destructive hint exists. |
@@ -25,8 +26,13 @@ Side-effect-free: validates eagerly and throws `TypeError` at module load on a b
 
 ## Two-module shape (the connect-later guarantee)
 The SDK's documented anonymous usage observations are default-on and independent of Connect.
-Connecting the site to the platform later changes only the entry-module wrapper config, adding
-`tracking.apiKey` to its existing `registerTools` options; tool modules never change. Do **not**
+Every generated `registerTools` call passes `{ tracking: { builtWith: "webmcp-kit/implement@<version>" } }`,
+where `<version>` is this plugin's manifest version (read whichever host manifest ships beside
+these skills: `.claude-plugin/plugin.json`, else `.codex-plugin/plugin.json`) — read it and
+write the real value (`webmcp-kit/implement@0.8.1`; the skill name is part of the stamp, so a site this skill generated and one `connect-existing-tools` migrated stay distinguishable); `<version>` is a placeholder in these examples, never
+something to ship. That one string is how the platform counts kit-built sites without a Connect,
+so never omit it and never invent a version. Connecting the site to the platform later changes only that same entry-module
+wrapper config, adding `tracking.apiKey` beside `builtWith`; tool modules never change. Do **not**
 add that publishable key during tool generation — the optional post-build flow in
 `references/connect.md` owns it after Connect reports the edge ready and the CLI confirms
 readiness.
@@ -38,6 +44,7 @@ import { defineTool } from "@nekuda/webmcp-sdk";
 export const addToCart = defineTool({
   stableKey: "cart.add",
   name: "add_to_cart",
+  source: "merchant_authored",
   title: "Add to cart",
   description: "Add a product to the shopping cart by SKU. Updates the cart badge.",
   inputSchema: {
@@ -95,7 +102,7 @@ import { addToCart } from "./tools/cart";
 
 export function WebmcpProvider() {
   useEffect(() => {
-    const reg = registerTools([addToCart]);
+    const reg = registerTools([addToCart], { tracking: { builtWith: "webmcp-kit/implement@<version>" } });
     return () => reg.unregister();
   }, []);
   return null;
@@ -112,7 +119,7 @@ import { askSite } from "./tools/site";
 
 export function WebmcpRegistrar() {
   useEffect(() => {
-    const reg = registerTools([askSite]);
+    const reg = registerTools([askSite], { tracking: { builtWith: "webmcp-kit/implement@<version>" } });
     return () => reg.unregister();
   }, []);
   return null;
@@ -125,7 +132,7 @@ export function WebmcpRegistrar() {
 import { registerTools } from "@nekuda/webmcp-sdk";
 import { askSite } from "./tools/site";
 
-const reg = registerTools([askSite]);
+const reg = registerTools([askSite], { tracking: { builtWith: "webmcp-kit/implement@<version>" } });
 addEventListener("pagehide", () => reg.unregister(), { once: true });
 ```
 

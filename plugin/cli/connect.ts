@@ -6,6 +6,7 @@ import { writeFileAtomic } from "./atomic-write";
 import type { CredentialStore, StoredCredentials } from "./credentials";
 import { createCredentialStore } from "./credentials";
 import { CliError, apiBaseFor, type LoginOptions, loginWithConfig } from "./login";
+import { KIT_SKILL_HEADER, KIT_USER_AGENT } from "./user-agent";
 
 export const CONNECT_DIRECTORY = ".webmcp";
 export const CONNECT_FILE = "connect.json";
@@ -82,6 +83,9 @@ export type ConnectOptions = LoginOptions & {
   maxAttempts?: number;
   sleep?: (milliseconds: number) => Promise<void>;
   projectKey?: string;
+  /** The skill running Connect (`implement` | `connect-existing-tools`); sent as a header so the
+   *  platform's `kit_connected` event can tell a generated site from a migrated one. */
+  skill?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -263,6 +267,7 @@ export async function apiJson(
       headers: {
         authorization: `Bearer ${credentials.access_token}`,
         "content-type": "application/json",
+        "user-agent": KIT_USER_AGENT,
         ...init.headers,
       },
     });
@@ -595,7 +600,11 @@ export async function connect(options: ConnectOptions): Promise<ConnectResult> {
       const domainValue = await apiJson(
         `${base}/v1/domains`,
         auth.credentials,
-        { method: "POST", body: JSON.stringify(domainBody) },
+        {
+          method: "POST",
+          body: JSON.stringify(domainBody),
+          ...(options.skill ? { headers: { [KIT_SKILL_HEADER]: options.skill } } : {}),
+        },
         fetcher,
       );
       if (!isRecord(domainValue) || !stringField(domainValue, "id")) {

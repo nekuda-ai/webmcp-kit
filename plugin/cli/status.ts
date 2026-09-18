@@ -11,6 +11,7 @@ import {
 } from "./connect";
 import { CliError, apiBaseFor, type LoginOptions } from "./login";
 import { callAt, structuralMask, topLevelArguments, withoutComments } from "./source-scan";
+import { KIT_USER_AGENT } from "./user-agent";
 
 const SOURCE_EXTENSIONS = new Set([
   ".js",
@@ -225,7 +226,7 @@ async function onlineKey(
   try {
     const response = await fetcher(
       `${base}/v1/domains/${encodeURIComponent(domainId)}/api-keys`,
-      { headers: { authorization: `Bearer ${accessToken}` } },
+      { headers: { authorization: `Bearer ${accessToken}`, "user-agent": KIT_USER_AGENT } },
     );
     if (!response.ok) return { checked: false, enabled: null, value: null };
     const body = await response.json();
