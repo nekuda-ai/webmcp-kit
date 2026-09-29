@@ -11,18 +11,24 @@ import { join } from "node:path";
  * down before argv is parsed. Read whichever is actually there instead. */
 const HOST_MANIFESTS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
 
-function manifestVersion(): string {
-  const root = join(import.meta.dir, "..");
+/** `cliDir` is a seam for the tests only — released code always resolves the manifests
+ * beside the CLI it is running from. */
+export function manifestVersion(cliDir: string = import.meta.dir): string {
+  const root = join(cliDir, "..");
   for (const rel of HOST_MANIFESTS) {
     const path = join(root, rel);
     let raw: string;
     try {
       raw = readFileSync(path, "utf8");
-    } catch {
-      continue; // Absent is expected — a build ships the manifests its host reads.
+    } catch (error) {
+      // Absent is expected — a build ships the manifests its host reads. Unreadable is not:
+      // a permission or I/O error leaves a manifest that names THIS release unread, and
+      // skipping it reports whatever the next one says.
+      if ((error as { code?: unknown }).code !== "ENOENT")
+        throw new Error(`${path}: unreadable (${error})`);
+      continue;
     }
-    // Present but unusable is not: falling through would quietly attribute this
-    // release to whatever the next manifest happens to say.
+    // Present but unusable is not either, for the same reason.
     let version: unknown;
     try {
       version = (JSON.parse(raw) as { version?: unknown }).version;

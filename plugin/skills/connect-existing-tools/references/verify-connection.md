@@ -1,6 +1,7 @@
-# Phase E — prove behavior survived and the connection is attributed
+# Phase E first, optional Connect second — prove behavior, then attribution
 
-Two claims, proven separately. Neither is assumed from the other.
+Two claims, proven separately and in this order. Finish section 1, including idempotency, before
+starting optional Connect or any tracking edit. Neither claim is assumed from the other.
 
 ## 1. Behavior is unchanged
 
@@ -64,6 +65,9 @@ tools not yet migrated, and nothing else.
 
 ## 2. The connection is attributed
 
+Start this section only after section 1 passes. Optional Connect writes the tracking configuration;
+this section then verifies that configuration and its runtime attribution.
+
 Attributed arrival is the claim, not "a request was sent". Anonymous observations are on by
 default before anything is connected, so their presence proves nothing about this step.
 
@@ -99,7 +103,8 @@ Observe the keyed request first; only then does silence mean the key was accepte
      saying usage is still being recorded anonymously, and pointing at re-running Connect.
 
 Repeat part 3 for every registration scope the inventory recorded. One scope proven attributed says
-nothing about the others; they each carry their own seam.
+nothing about the others; they each carry their own seam. Within one scope, one safe accepted call
+is enough to prove attribution; it does not prove that every tool works in production.
 
 Part 3 is the only one of the three that observes what a visitor's browser actually does, which is
 why the other two cannot stand in for it.
@@ -129,8 +134,9 @@ CSP rule, an offline dev machine — and is reported as such, not as a rejected 
 
 ### When part 3 cannot run
 
-No runnable browser, or Connect skipped or declined. Then parts 1 and 2 stand alone and the honest
-claim is "configured", not "attributed". Say which part is missing and what it would have proven.
+No runnable browser, no tool that is safe to invoke, or Connect skipped or declined. Then parts 1
+and 2 stand alone and the honest claim is "configured", not "attributed". Say which part is missing
+and what it would have proven.
 Do not promote a configuration check into an arrival claim; that is the exact confusion this phase
 exists to prevent.
 

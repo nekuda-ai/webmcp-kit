@@ -7,6 +7,8 @@ export type AtomicWriteOptions = {
   mode?: number;
   /** When set, the containing directory is created with — and forced to — this mode. */
   directoryMode?: number;
+  /** Validate a source snapshot immediately before replacing the destination. */
+  beforeCommit?: () => Promise<void>;
 };
 
 /**
@@ -41,6 +43,7 @@ export async function writeFileAtomic(
     // umask can clear bits `open` was asked for; the rename then carries this
     // inode — and its mode — to the destination name.
     await chmod(temporary, mode);
+    await options.beforeCommit?.();
     await rename(temporary, path);
   } finally {
     await rm(temporary, { force: true });

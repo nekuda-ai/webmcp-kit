@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>nekuda</title>
+  <rect width="512" height="512" fill="#000"/>
+  <g transform="translate(256 256) scale(0.913) translate(-141.441 -119.686)">
+    <rect x="22.625" y="13.7695" width="237.632" height="211.832" rx="105.916" fill="#fff"/>
+    <rect x="81.538" y="72.683" width="119.806" height="94.006" rx="47.003" fill="#00BFFF"/>
+  </g>
+</svg>

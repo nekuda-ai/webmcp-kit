@@ -16,7 +16,7 @@ Side-effect-free: validates eagerly and throws `TypeError` at module load on a b
 | `description` | yes, non-empty | The product — the agent picks by name + description. Ships **verbatim** from the approved plan. Also state any consequence ("places an order"). |
 | `inputSchema` | no | Plain JSON Schema object: `{ type: "object", properties, required, additionalProperties: false }`. |
 | `annotations` | no | `{ readOnlyHint?, untrustedContentHint? }`. Pure reads → `readOnlyHint: true`. User/third-party content → `untrustedContentHint: true`. No destructive hint exists. |
-| `execute(input)` | yes | Page-owned; the Phase-C wiring path verbatim. Return any JSON value, a string, or `{ content: [...] }` — the SDK normalizes. **Throw on failure and on missing anchors/data** — never succeed-on-missing (a silent success poisons the drift signal). Thrown errors propagate to the agent. A read that finds nothing is not a failure: return the empty result plus an explicit note field saying the site has no matching content — never throw, never a bare `[]`. |
+| `execute(input)` | yes | Page-owned; the Phase-C wiring path verbatim. Return any JSON value, a string, or `{ content: [...] }` — the SDK normalizes. **Throw on failure and on missing anchors/data** — never succeed-on-missing (a silent success poisons the drift signal). The SDK returns a thrown error's message to the agent as an error result. A read that finds nothing is not a failure: return the empty result plus an explicit note field saying the site has no matching content — never throw, never a bare `[]`. |
 
 ## `registerTools(tools, { signal? })` → `{ ready, unregister, signal }`
 - Registers the batch immediately. **Unregister only** via `unregister()` or by aborting `signal` — the spec's sole (AbortSignal) mechanism. No `unregisterTool` / `provideContext`.
@@ -29,7 +29,7 @@ The SDK's documented anonymous usage observations are default-on and independent
 Every generated `registerTools` call passes `{ tracking: { builtWith: "webmcp-kit/implement@<version>" } }`,
 where `<version>` is this plugin's manifest version (read whichever host manifest ships beside
 these skills: `.claude-plugin/plugin.json`, else `.codex-plugin/plugin.json`) — read it and
-write the real value (`webmcp-kit/implement@0.8.1`; the skill name is part of the stamp, so a site this skill generated and one `connect-existing-tools` migrated stay distinguishable); `<version>` is a placeholder in these examples, never
+write the real value (`webmcp-kit/implement@0.9.0`; the skill name is part of the stamp, so a site this skill generated and one `connect-existing-tools` migrated stay distinguishable); `<version>` is a placeholder in these examples, never
 something to ship. That one string is how the platform counts kit-built sites without a Connect,
 so never omit it and never invent a version. Connecting the site to the platform later changes only that same entry-module
 wrapper config, adding `tracking.apiKey` beside `builtWith`; tool modules never change. Do **not**

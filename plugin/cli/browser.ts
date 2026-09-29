@@ -6,10 +6,14 @@ import { join, win32 } from "node:path";
 
 type Output = { code: number; stdout: string; stderr: string };
 
+// Pinned: npm fetches these at run time. Bump with the tests and skill docs.
+export const DRIVER_PACKAGE = "chrome-devtools-mcp@1.10.1";
+export const BROWSER_INSTALLER_PACKAGE = "@puppeteer/browsers@3.2.3";
+
 const PACKAGE_ARGS = [
   "exec",
   "--yes",
-  "--package=chrome-devtools-mcp@latest",
+  `--package=${DRIVER_PACKAGE}`,
   "--",
   "chrome-devtools",
 ] as const;
@@ -24,6 +28,19 @@ const START_FLAGS = [
   "--redact-network-headers=true",
 ] as const;
 
+// Children, npm-fetched packages included, get what they need to run and reach the network,
+// never the ambient env and its tokens. npm still reads ~/.npmrc itself.
+const FORWARDED_ENV =
+  /^(?:PATH|PATHEXT|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|PROGRAMDATA|PROGRAMFILES(?:\(X86\))?|SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|TEMP|TMP|TMPDIR|USER|LOGNAME|SHELL|LANG|LC_[A-Z]+|TZ|TERM|XDG_[A-Z_]+|(?:HTTPS?|ALL|NO)_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_(?:FILE|DIR)|NPM_CONFIG_(?:REGISTRY|CACHE|USERCONFIG|CAFILE|STRICT_SSL|(?:HTTPS_)?PROXY|NOPROXY))$/i;
+
+export function childEnv(
+  source: Record<string, string | undefined> = process.env,
+  extra?: Record<string, string>,
+): Record<string, string> {
+  const kept = Object.entries(source).filter(([name, value]) => value !== undefined && FORWARDED_ENV.test(name));
+  return { ...(Object.fromEntries(kept) as Record<string, string>), ...extra };
+}
+
 async function run(
   command: string,
   args: string[],
@@ -31,7 +48,7 @@ async function run(
 ): Promise<Output> {
   try {
     const child = Bun.spawn([command, ...args], {
-      env: extraEnv ? { ...process.env, ...extraEnv } : undefined,
+      env: childEnv(process.env, extraEnv),
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
@@ -214,7 +231,7 @@ async function installBrowser(npm: string, nodeVersion: string): Promise<string 
   }
   if (!installerNodeSupported(nodeVersion)) {
     await fail(
-      `Chrome is missing and @puppeteer/browsers@latest requires Node 22.12+; current ${nodeVersion.trim()}.`,
+      `Chrome is missing and ${BROWSER_INSTALLER_PACKAGE} requires Node 22.12+; current ${nodeVersion.trim()}.`,
     );
     return undefined;
   }
@@ -222,7 +239,7 @@ async function installBrowser(npm: string, nodeVersion: string): Promise<string 
   const result = await run(npm, [
     "exec",
     "--yes",
-    "--package=@puppeteer/browsers@latest",
+    `--package=${BROWSER_INSTALLER_PACKAGE}`,
     "--",
     "browsers",
     "install",
@@ -252,7 +269,7 @@ export async function browserMain(args: string[]): Promise<number> {
     );
   }
   const npm = Bun.which("npm");
-  if (!npm) return fail("npm is required to resolve chrome-devtools-mcp@latest. Install npm, then retry.");
+  if (!npm) return fail(`npm is required to resolve ${DRIVER_PACKAGE}. Install npm, then retry.`);
   if (args.some((arg) => arg === "--sessionId" || arg.startsWith("--sessionId="))) {
     return fail("Use WEBMCP_BROWSER_SESSION_ID instead of passing the upstream --sessionId flag.");
   }

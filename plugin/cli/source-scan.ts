@@ -79,7 +79,12 @@ export function scanDesynchronized(source: string): boolean {
   return quote !== null;
 }
 
-/** Remove comments without damaging quoted strings; enough to keep examples from becoming facts. */
+/**
+ * Blank comments without damaging quoted strings, so an example in a comment never becomes a
+ * fact. Every dropped character becomes a space (newlines stay), so an index into the result
+ * is an index into `source`: the readers only scan it, and the entry-module editor locates
+ * spans on it and splices the ORIGINAL bytes, comments and all.
+ */
 export function withoutComments(source: string): string {
   let output = "";
   let quote: "'" | '"' | "`" | null = null;
@@ -106,15 +111,18 @@ export function withoutComments(source: string): string {
       continue;
     }
     if (char === "/" && next === "/") {
-      while (i < source.length && source[i] !== "\n") i += 1;
+      while (i < source.length && source[i] !== "\n") {
+        output += " ";
+        i += 1;
+      }
       output += "\n";
       continue;
     }
     if (char === "/" && next === "*") {
-      i += 2;
-      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
-      i += 1;
-      output += " ";
+      const end = source.indexOf("*/", i + 2);
+      const stop = end < 0 ? source.length : end + 2;
+      output += source.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop - 1;
       continue;
     }
     output += char;

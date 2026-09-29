@@ -34,6 +34,31 @@ the `connect-existing-tools` skill moves their **registration** onto the SDK —
 same names, same schemas, same handlers — and proves each one still behaves as
 it did before.
 
+## Connect to AgentLane (optional)
+
+Once the tools are verified, the skill offers — and only offers — to connect the site to
+[AgentLane](https://docs.nekuda.ai), so the developer can watch the tools and every call to
+them in a dashboard. Declining changes nothing about the tools.
+
+- **Sign-in.** Accepting opens the developer's AgentLane account in the browser. The kit's
+  `webmcp` CLI keeps the login in OS secure storage; it is never printed, logged, or written
+  into the repo.
+- **What accepting does.** It creates (or reuses) a project in AgentLane named after the
+  site's `package.json` name — the developer can pick another — and writes one line into the
+  approved entry module: a `tracking` option with the project's publishable key, marked in
+  the source as safe to commit. That key only attributes tool activity to the project; it
+  grants nothing. Tool modules are never touched, and on any failure the entry module is
+  left byte-for-byte as it was.
+- **What is sent.** After connecting, each tool call reports its name, outcome and timing to
+  the project. If the developer also accepts the separate **publish** offer, the approved
+  tool descriptions (name, description, input schema) are sent so the tools appear in the
+  catalog before anything calls them. Handler bodies, other source files, and credentials
+  are never sent, at either step.
+- **Where results show.** The run ends with the dashboard link for that project.
+
+The SDK's anonymous usage observations are on by default and independent of Connect; Connect
+is what ties activity to an account, not what starts it.
+
 ## Facts worth carrying
 
 - **Local only.** The plugin never sends the user's code to any external or

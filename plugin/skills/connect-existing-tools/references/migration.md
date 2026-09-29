@@ -151,7 +151,12 @@ Connect is not re-specified here. It defers to the `implement` skill's
 `references/connect.md` — login, provisioning, the readiness gate, the entry-module seam edit, and
 the rule that a non-interactive run skips it. Read that file, and follow it as written, with the
 one multi-scope amendment stated below — and pass `--skill connect-existing-tools` where its step 2
-says `--skill implement`, so the platform's Connect record names this skill.
+says `--skill implement`, so the platform's Connect record names this skill. Its `--entry` is the
+recorded entry module of the registration scope that run covers.
+
+**Order is mandatory:** finish Phase E's behavior diff and idempotency check (section 1 of
+`verify-connection.md`) before starting Connect. A connection is never configured on a migration
+that has not yet been shown to behave as before.
 
 Two things it assumes, which this skill must have already done: every migrated tool is registered
 through `registerTools` (Connect writes `tracking` into *existing* batches — it never creates one),

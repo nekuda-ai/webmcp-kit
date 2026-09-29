@@ -245,9 +245,12 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
   }
 
   const { path, display } = entryModulePath(workspace, options.entry);
-  const manifest = await extractManifest(path, display);
+  const manifest = await extractManifest(path, display, workspace);
   if (manifest.entries.length === 0) {
-    throw new CliError("no_tools_found", `No defineTool calls found in ${display}`);
+    throw new CliError(
+      "no_tools_found",
+      `No defineTool calls found in ${display} or the modules it imports`,
+    );
   }
 
   const environment = (options.environment ?? connection.environment).trim().toLowerCase();

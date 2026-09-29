@@ -8,7 +8,7 @@ import { status } from "./status";
 
 const USAGE = `Usage:
   webmcp login [--json]
-  webmcp connect --workspace <dir> [--site-url <url>] [--environment <name>] [--org <id>] [--skill <name>] [--json]
+  webmcp connect --workspace <dir> [--entry <file>] [--name <project>] [--site-url <url>] [--environment <name>] [--org <id>] [--skill <name>] [--json]
   webmcp status --workspace <dir> [--json]
   webmcp publish --workspace <dir> --entry <file> [--scope <name>] [--environment <name>] [--yes] [--json]
   webmcp browser <command> [...args]`;
@@ -50,6 +50,7 @@ function parseArgs(args: string[]): Parsed {
     "--entry",
     "--scope",
     "--skill",
+    "--name",
   ]);
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index] ?? "";
@@ -84,7 +85,7 @@ export async function main(args: string[], options: MainOptions = {}): Promise<n
 
   const allowedValues =
     parsed.command === "connect"
-      ? new Set(["--workspace", "--site-url", "--environment", "--org", "--skill"])
+      ? new Set(["--workspace", "--entry", "--name", "--site-url", "--environment", "--org", "--skill"])
       : parsed.command === "status"
         ? new Set(["--workspace"])
         : parsed.command === "publish"
@@ -131,6 +132,8 @@ export async function main(args: string[], options: MainOptions = {}): Promise<n
         environment: parsed.values["--environment"],
         org: parsed.values["--org"],
         skill: parsed.values["--skill"],
+        entry: parsed.values["--entry"],
+        name: parsed.values["--name"],
         showAuthorizationUrl:
           options.showAuthorizationUrl ??
           ((url) => io.stderr(`Open this URL if your browser did not open:\n${url}`)),

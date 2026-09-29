@@ -5,6 +5,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { writeFileAtomic } from "./atomic-write";
 import type { CredentialStore, StoredCredentials } from "./credentials";
 import { createCredentialStore } from "./credentials";
+import { type EntryModule, loadEntryModule } from "./entry-module";
 import { CliError, apiBaseFor, type LoginOptions, loginWithConfig } from "./login";
 import { KIT_SKILL_HEADER, KIT_USER_AGENT } from "./user-agent";
 
@@ -58,11 +59,14 @@ export type ConnectResult = {
   org: string;
   domain: { id: string; public_id: string; display_name: string };
   environment: string;
-  api_key: { id: string; value: string; enabled: boolean };
+  /** `value` is present only when the CLI did not write it into the source itself. */
+  api_key: { id: string; value?: string; enabled: boolean };
   dashboard_url: string;
   ingest_url?: string;
   reused: boolean;
   connection_file: string | null;
+  /** Present when `entry` was given: the module the key was written into. */
+  entry_module?: { path: string; batches: number; written: true };
 };
 
 type ProvisionResponse = {
@@ -86,7 +90,32 @@ export type ConnectOptions = LoginOptions & {
   /** The skill running Connect (`implement` | `connect-existing-tools`); sent as a header so the
    *  platform's `kit_connected` event can tell a generated site from a migrated one. */
   skill?: string;
+  /**
+   * The approved entry module, workspace-relative. When given, the CLI writes `tracking.apiKey`
+   * into every `registerTools` batch itself once the edge is ready, and the key is left out of
+   * the result — it never has to pass through the agent.
+   */
+  entry?: string;
+  /** The project's display name in AgentLane; defaults to the package name, then the folder. */
+  name?: string;
 };
+
+/**
+ * What a project is called when nobody says: the `package.json` name without its scope, and
+ * the folder only as a last resort. A folder name is where the checkout happens to live; the
+ * package name is what the developer called the site.
+ */
+export async function defaultDisplayName(workspace: string): Promise<string> {
+  try {
+    const parsed = JSON.parse(await readFile(join(workspace, "package.json"), "utf8"));
+    const name = isRecord(parsed) && typeof parsed.name === "string" ? parsed.name.trim() : "";
+    const unscoped = name.replace(/^@[^/]+\//, "");
+    if (unscoped) return unscoped;
+  } catch {
+    // No package.json, or not JSON: the folder name stands in.
+  }
+  return basename(workspace);
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -578,6 +607,13 @@ export async function connect(options: ConnectOptions): Promise<ConnectResult> {
       throw new CliError("invalid_site_url", "--site-url must be an http(s) URL");
     }
   }
+  // Proven writable before any provisioning, so a wrong path creates no Domain and no key.
+  const entry: EntryModule | null =
+    options.entry === undefined ? null : await loadEntryModule(workspace, options.entry);
+  const displayName = (options.name?.trim() || (await defaultDisplayName(workspace))).slice(
+    0,
+    128,
+  );
   const store = options.store ?? createCredentialStore();
   const fetcher = options.fetch ?? fetch;
   const base = apiBaseFor(options);
@@ -593,7 +629,7 @@ export async function connect(options: ConnectOptions): Promise<ConnectResult> {
       const domainBody = {
         project_key: projectKey,
         source: "kit",
-        display_name: basename(workspace),
+        display_name: displayName,
         ...(siteUrl ? { site_url: siteUrl } : {}),
         ...(saved?.org === auth.identity.org ? { domain_id: saved.domain_id } : {}),
       };
@@ -646,6 +682,14 @@ export async function connect(options: ConnectOptions): Promise<ConnectResult> {
         ? "disabled"
         : "pending";
     let path: string | null = null;
+    if (provisioned.edge_ready && entry) {
+      // Source first: a run that dies between the two leaves connect.json absent, which
+      // `status` reports as not connected, and a re-run rewrites the same bytes.
+      await writeFileAtomic(entry.path, entry.wire(provisioned.api_key.key, auth.ingestUrl), {
+        mode: entry.mode,
+        beforeCommit: entry.assertUnchanged,
+      });
+    }
     if (provisioned.edge_ready) {
       path = await writeConnectFile(workspace, {
         org: auth.identity.org as string,
@@ -667,13 +711,16 @@ export async function connect(options: ConnectOptions): Promise<ConnectResult> {
       environment,
       api_key: {
         id: provisioned.api_key.id,
-        value: provisioned.api_key.key,
+        ...(entry ? {} : { value: provisioned.api_key.key }),
         enabled: provisioned.api_key.enabled,
       },
       dashboard_url: provisioned.dashboard_url,
       ...(auth.ingestUrl ? { ingest_url: auth.ingestUrl } : {}),
       reused: provisioned.reused,
       connection_file: path,
+      ...(entry && provisioned.edge_ready
+        ? { entry_module: { path: entry.display, batches: entry.batches, written: true as const } }
+        : {}),
     };
   });
 }

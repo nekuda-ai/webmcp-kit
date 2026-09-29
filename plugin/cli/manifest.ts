@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { dirname, relative, resolve } from "node:path";
 import { CliError } from "./login";
 import {
   callAt,
@@ -7,6 +8,7 @@ import {
   topLevelArguments,
   withoutComments,
 } from "./source-scan";
+import { workspaceFile } from "./workspace-file";
 
 /**
  * The publish manifest: what an entry module DECLARES about its tools, read out of the
@@ -17,6 +19,9 @@ import {
  * are not there, a bundler-specific resolution graph — to learn metadata that is written
  * literally in the file. It would also make "what gets published" depend on what happened
  * to execute, which is exactly the property a publish must not have.
+ *
+ * Follow relative imports as text to find tools in the implement skill's separate tool modules.
+ * Bare specifiers and bundler aliases are not resolved.
  *
  * The cost is that only STATIC definitions can be published, and that is stated as a
  * refusal rather than a silent omission: a tool built in a loop or spread from a shared
@@ -71,6 +76,8 @@ export type ManifestEntry = {
 export type Manifest = {
   /** Workspace-relative, POSIX-separated: what the run published, for the operator. */
   entry_module: string;
+  /** The modules that declared at least one tool, in the order their tools were read. */
+  modules: string[];
   entries: ManifestEntry[];
 };
 
@@ -401,16 +408,128 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Read one entry module and return what it declares. Never imports it. */
+/** The module extensions an import specifier may resolve to; anything else is an asset. */
+const MODULE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
+const MODULE_SIZE_LIMIT = 1024 * 1024;
+
+/**
+ * Every relative specifier this module imports, in source order: an `import`/`export` with a
+ * `from` clause, a side-effect import, a dynamic import, or a `require` call.
+ *
+ * Keywords are matched on the structural mask, so a specifier mentioned inside a string is
+ * never one; the specifier itself is then read out of the comment-free code at that same
+ * index, which the mask preserves position for.
+ */
+export function relativeImports(source: string): string[] {
+  const code = withoutComments(source);
+  const mask = structuralMask(code);
+  const specifiers: string[] = [];
+  const keyword = /\b(?:import|from|require)\b/g;
+  for (let match = keyword.exec(mask); match; match = keyword.exec(mask)) {
+    if (mask.slice(0, match.index).trimEnd().endsWith(".")) continue;
+    let i = match.index + match[0].length;
+    while (/\s/.test(code[i] ?? "")) i += 1;
+    if (code[i] === "(") {
+      i += 1;
+      while (/\s/.test(code[i] ?? "")) i += 1;
+    }
+    const quote = code[i];
+    if (quote !== '"' && quote !== "'") continue;
+    const end = code.indexOf(quote, i + 1);
+    if (end < 0) continue;
+    const specifier = code.slice(i + 1, end);
+    if (specifier.startsWith("./") || specifier.startsWith("../")) specifiers.push(specifier);
+  }
+  return specifiers;
+}
+
+async function moduleFile(path: string): Promise<boolean> {
+  try {
+    const info = await stat(path);
+    return info.isFile() && info.size <= MODULE_SIZE_LIMIT;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve source extensions, directory indexes, and ESM `.js` specifiers' TS siblings.
+ * Assets and unresolved imports return null.
+ */
+async function resolveImport(from: string, specifier: string): Promise<string | null> {
+  const base = resolve(dirname(from), specifier);
+  const candidates = [base];
+  const suffix = /\.(m|c)?js$/.exec(base);
+  if (suffix) {
+    const stem = base.slice(0, -suffix[0].length);
+    candidates.push(`${stem}.${suffix[1] ?? ""}ts`, `${stem}.tsx`);
+  }
+  for (const extension of MODULE_EXTENSIONS) candidates.push(`${base}${extension}`);
+  for (const extension of MODULE_EXTENSIONS) candidates.push(`${base}/index${extension}`);
+  for (const candidate of candidates) {
+    if (!MODULE_EXTENSIONS.some((extension) => candidate.endsWith(extension))) continue;
+    if (await moduleFile(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Read one entry module and the tool modules it imports, and return what they declare.
+ * Never imports any of them.
+ *
+ * The entry module's own tools come first, then each import's, depth-first in source
+ * order, so the same tree always publishes the same list. A module is read once however
+ * many paths reach it, which is what ends a cycle.
+ */
 export async function extractManifest(
   entryModulePath: string,
-  displayPath = entryModulePath,
+  displayPath: string,
+  workspace: string,
 ): Promise<Manifest> {
+  workspace = await realpath(workspace);
   let source: string;
   try {
+    entryModulePath = await workspaceFile(workspace, entryModulePath, "module_outside_workspace");
     source = await readFile(entryModulePath, "utf8");
-  } catch {
+  } catch (error) {
+    if (error instanceof CliError) throw error;
     throw new CliError("entry_module_not_found", `Entry module not found: ${displayPath}`);
   }
-  return { entry_module: displayPath, entries: parseManifest(displayPath, source) };
+  const modules: string[] = [];
+  const entries: ManifestEntry[] = [];
+  const declaredIn = new Map<string, string>();
+  const visited = new Set<string>([entryModulePath]);
+
+  const read = async (path: string, display: string, text: string): Promise<void> => {
+    const declared = parseManifest(display, text);
+    for (const entry of declared) {
+      const elsewhere = declaredIn.get(entry.stable_key);
+      if (elsewhere) refuse(display, `"${entry.stable_key}"`, `is already declared in ${elsewhere}`);
+      declaredIn.set(entry.stable_key, display);
+    }
+    if (declared.length > 0) {
+      modules.push(display);
+      entries.push(...declared);
+    }
+    for (const specifier of relativeImports(text)) {
+      const candidate = await resolveImport(path, specifier);
+      if (!candidate) continue;
+      let resolved: string;
+      try {
+        resolved = await workspaceFile(workspace, candidate, "module_outside_workspace");
+      } catch (error) {
+        if (!(error instanceof CliError)) throw error;
+        throw new CliError(
+          "module_outside_workspace",
+          `${display} imports ${specifier}, which is outside the workspace`,
+        );
+      }
+      if (visited.has(resolved)) continue;
+      const relativeDisplay = relative(workspace, resolved).replaceAll("\\", "/");
+      visited.add(resolved);
+      await read(resolved, relativeDisplay, await readFile(resolved, "utf8"));
+    }
+  };
+  await read(entryModulePath, displayPath, source);
+  return { entry_module: displayPath, modules, entries };
 }

@@ -1,15 +1,9 @@
 ---
-description: Star the WebMCP Kit repo on GitHub with your gh CLI
-allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/implement/scripts/star-repo.sh:*)
+description: Get the link to star the WebMCP Kit repo on GitHub
 ---
 
-The user invoked this command, which is their consent to star the repo. Run:
+Give the user this link so they can star the repo themselves:
+https://github.com/nekuda-ai/webmcp-kit
 
-```
-${CLAUDE_PLUGIN_ROOT}/skills/implement/scripts/star-repo.sh
-```
-
-Relay the script's one-line outcome verbatim. If it reports gh missing or
-unauthenticated, tell the user they can star manually at
-https://github.com/nekuda-ai/webmcp-kit. Do not retry, and do not attempt any
-other way of starring.
+Do not star it for them: no `gh`, no GitHub API call, no other way of starring.
+WebMCP Kit never uses the user's GitHub credentials.
