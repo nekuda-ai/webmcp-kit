@@ -28,6 +28,9 @@ const START_FLAGS = [
   "--redact-network-headers=true",
 ] as const;
 
+// An attached browser was launched by someone else: only the driver's own settings apply.
+const ATTACH_FLAGS = START_FLAGS.filter((flag) => !/^--(?:headless|isolated|chrome-arg)=/.test(flag));
+
 // Children, npm-fetched packages included, get what they need to run and reach the network,
 // never the ambient env and its tokens. npm still reads ~/.npmrc itself.
 const FORWARDED_ENV =
@@ -254,12 +257,43 @@ async function installBrowser(npm: string, nodeVersion: string): Promise<string 
   return result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
 }
 
+// The pinned driver reports an unreachable browser as a tool result on stdout, exiting 0; a
+// page listing is an object with `pages` among npm's notice lines: one parse from each line
+// opening an object to the last `}`.
+export function listed({ code, stdout }: Output): boolean {
+  const end = stdout.lastIndexOf("}") + 1;
+  return code === 0 && [...stdout.matchAll(/^\{/gm)].some((m) => pages(stdout.slice(m.index, end)));
+}
+
+function pages(text: string): boolean {
+  try {
+    return "pages" in Object(JSON.parse(text));
+  } catch {
+    return false;
+  }
+}
+
 async function fail(message: string, detail = ""): Promise<number> {
   process.stderr.write(`webmcp browser: ${message}${detail ? `\n${detail.trim()}\n` : "\n"}`);
   return 1;
 }
 
 export async function browserMain(args: string[]): Promise<number> {
+  const attachUrl = args[0] === "start" ? process.env.WEBMCP_BROWSER_URL : undefined;
+  if (attachUrl) {
+    // The driver finds the browser's socket at `<url>/json/version`.
+    if (!/^https?:\/\/./i.test(attachUrl) || !URL.canParse(attachUrl)) {
+      return fail(`WEBMCP_BROWSER_URL must be an http(s) DevTools endpoint, such as http://127.0.0.1:9222.`);
+    }
+    // It reaches the driver as --browserUrl, and argv is readable by any local user.
+    const { username, password } = new URL(attachUrl);
+    if (username || password) {
+      return fail(
+        "WEBMCP_BROWSER_URL must not carry credentials: the driver's argv would show them to every local user. Expose the endpoint without them, e.g. an SSH tunnel to 127.0.0.1.",
+      );
+    }
+    if (executablePath(args.slice(1))) return fail("Nothing to launch when attaching: unset WEBMCP_BROWSER_URL or drop --executable-path.");
+  }
   const node = Bun.which("node");
   if (!node) return fail("Node.js is required. Install a supported Node.js release, then retry.");
   const nodeVersion = await run(node, ["--version"]);
@@ -277,20 +311,19 @@ export async function browserMain(args: string[]): Promise<number> {
 
   const command = args[0];
   if (command === "start") {
-    const explicit = executablePath(args.slice(1));
-    const path = explicit ?? (await discoverBrowser()) ?? (await installBrowser(npm, nodeVersion.stdout));
-    if (!path) return 1;
-    const version = await probeBrowser(path);
-    if (version.code !== 0 || !browserSupported(version.stdout)) {
-      return fail(`Chrome 150+ is required; ${path} is not a supported executable.`, version.stderr);
+    let browser: string[];
+    if (attachUrl) {
+      browser = [`--browserUrl=${attachUrl}`, ...ATTACH_FLAGS];
+    } else {
+      const path = executablePath(args.slice(1)) ?? (await discoverBrowser()) ?? (await installBrowser(npm, nodeVersion.stdout));
+      if (!path) return 1;
+      const version = await probeBrowser(path);
+      if (version.code !== 0 || !browserSupported(version.stdout)) {
+        return fail(`Chrome 150+ is required; ${path} is not a supported executable.`, version.stderr);
+      }
+      browser = [...START_FLAGS, `--executable-path=${path}`];
     }
-    const startArgs = [
-      ...PACKAGE_ARGS,
-      "start",
-      ...START_FLAGS,
-      `--executable-path=${path}`,
-      `--sessionId=${sessionId}`,
-    ];
+    const startArgs = [...PACKAGE_ARGS, "start", ...browser, `--sessionId=${sessionId}`];
     let result = await run(npm, startArgs);
     if (result.code !== 0 && /(?:stale|daemon|socket|pid)/i.test(result.stderr)) {
       const stopped = await run(npm, [...PACKAGE_ARGS, "stop", `--sessionId=${sessionId}`]);
@@ -305,7 +338,13 @@ export async function browserMain(args: string[]): Promise<number> {
     }
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
-    return result.code;
+    if (result.code !== 0 || !attachUrl) return result.code;
+    // The daemon connects lazily: connect now, the way every later command will, so a dead
+    // endpoint fails `start` with its cause.
+    const pages = await run(npm, [...PACKAGE_ARGS, "list_pages", "--output-format=json", `--sessionId=${sessionId}`]);
+    if (listed(pages)) return 0;
+    await run(npm, [...PACKAGE_ARGS, "stop", `--sessionId=${sessionId}`]);
+    return fail(`no browser to attach to at WEBMCP_BROWSER_URL=${attachUrl}.`, pages.stderr || pages.stdout);
   }
 
   const result = await run(npm, [...PACKAGE_ARGS, ...args, `--sessionId=${sessionId}`]);

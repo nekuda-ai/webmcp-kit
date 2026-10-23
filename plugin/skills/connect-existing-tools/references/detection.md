@@ -87,7 +87,8 @@ webmcp="${plugin_root}/scripts/webmcp.sh"
 
 On Windows use `$env:CLAUDE_PLUGIN_ROOT`, then `$env:PLUGIN_ROOT`, then
 `(Resolve-Path "<absolute base directory for this skill>\..\..").Path`, and run `scripts\webmcp.cmd`.
-The driver's requirements, flags, and failure handling are the `verify` skill's, unchanged — read
+With no `scripts/webmcp.sh` there (this skill came from the AgentLane MCP), run the same pinned
+driver through npx, as the `verify` skill's *Without the plugin* section shows. The driver's requirements, flags, and failure handling are the `verify` skill's, unchanged — read
 them there rather than restating them here. Visit each declared page **once** per auth state and
 list its tools in that single pass; navigation is the expensive unit, not the tool.
 

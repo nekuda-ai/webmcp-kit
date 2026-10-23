@@ -11,8 +11,8 @@ Call the `AskUserQuestion` tool. Never print the choices as text and wait for a 
 the tool is available.
 
 - **Labels are the exact choice strings** the calling reference names — `Connect to AgentLane`,
-  `Skip for now`, `Publish tool descriptions` — never a paraphrase. The e2e checks and the Explorer
-  copy pin those strings, and the picker is the same decision in a different surface.
+  `Skip for now`, `Publish tool descriptions` — never a paraphrase. The Explorer shows the same
+  strings, and the picker is the same decision in a different surface.
 - **The stated default is the first option.** A plan's *needs your input* item lists its default
   first; the Connect and publish offers list the action first and `Skip for now` second.
 - **The description carries the consequence**, one sentence, in the calling reference's own words
@@ -30,20 +30,21 @@ the tool is available.
   module it is about, and each answer is recorded against that module alone.
 
 Wording inside labels and descriptions follows the developer-facing wording rule in
-`references/connect.md`, and never echoes a CLI field, error code, or raw error prose.
+`references/connect.md`, and never echoes a tool field, error code, or raw error prose.
 
 ## Codex, or any host without that tool — printed choices
 
 Present the same explanation, then the choices as their exact labels, one per line, and end the
-turn. The developer's reply is the decision. This is the current behavior, kept verbatim: the Codex
-e2e preview reads the visible pane for `Connect to AgentLane` and `Skip for now` before it consents.
+turn. The developer's reply is the decision, so print each label exactly as written
+(`Connect to AgentLane`, `Skip for now`): the reply names one of them.
 
 ## When this file does not apply
 
 - **Explorer loop active** — the Explorer owns the decision as a durable journal event
   (`references/interactive.md`). Do not also raise a picker for the same choice.
-- **`--non-interactive`** — no prompt at all. Take the stated defaults and record each one in the
-  report, per the calling skill's Degrade path.
+- **Non-interactive** — no prompt at all. Take the stated defaults and record each one in the
+  report: `references/non-interactive.md` for `implement`, the calling skill's Degrade path
+  otherwise.
 
 ## The answer is the decision record
 

@@ -619,8 +619,8 @@ function writeAtomic(path: string, text: string): void {
 }
 
 function ensureRuntimeIgnored(): void {
-  // `connect.lock` is runtime state like the rest: it names a pid, and a committed one
-  // wedges `webmcp connect` with `connect_in_progress` in every clone of the repo.
+  // `connect.lock` is runtime state like the rest: the retired Connect command (plugin 0.9)
+  // wrote it with a pid, so a repo from then can still hold one; it stays ignored.
   const required = [".port*", ".run.json*", ".server.lock*", ".ack.lock*", "connect.lock*"];
   let existing = readRegularText(gitignoreFile, 64 * 1024) ?? "";
   const lines = new Set(existing.split("\n"));

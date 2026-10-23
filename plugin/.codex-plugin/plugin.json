@@ -1,6 +1,6 @@
 {
   "name": "webmcp-kit",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Add WebMCP tools to a web app: read the repo, propose a reviewable tool plan, implement the tools, and verify them in a browser — or connect the tools a site already has, without rebuilding them.",
   "author": { "name": "nekuda", "url": "https://github.com/nekuda-ai" },
   "homepage": "https://github.com/nekuda-ai/webmcp-kit",
@@ -9,6 +9,7 @@
   "keywords": ["webmcp", "model-context", "browser-agents", "nekuda", "agent-tools"],
   "skills": "./skills/",
   "hooks": "./com.openai/hooks/hooks.json",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "WebMCP Kit",
     "shortDescription": "Make web apps agent-ready",

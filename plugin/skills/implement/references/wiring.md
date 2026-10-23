@@ -1,31 +1,48 @@
 # Wiring — safe call paths, placement, confidence
 
-## Safe call path = client-reachable only
-`execute` runs in the visitor's browser on the page's session. Pick the **highest available rung** per tool:
+## Safe call path: client-reachable only
 
-1. **The app's own client data layer** — its API client, hooks, or store actions. Rides the session and keeps the UI in sync. Preferred.
+`execute` runs in the visitor's browser on the page's session. For each tool take the **highest
+available rung** and name the concrete path (file and function):
+
+1. **The app's own client data layer** — its API client, hooks or store actions. It rides the
+   session and keeps the UI in sync. Preferred.
 2. **A same-origin HTTP route the client already calls** — `fetch` to the app's own API.
-3. **The app's own client-side actions for ui_effect** — router navigation, invoking the app's existing form handler.
-4. **Build-time content bundle** — the `ask_site` rung-1 path for static content.
+3. **The app's own client-side actions** — router navigation, the app's existing form handler.
+4. **A content index generated from the repo** — `ask_site` over content the repo holds.
 
-**Never:** server-only imports (DB clients, secrets, non-exposed server actions), third-party endpoints, or DOM-scraping the app's own UI when a data path exists.
+Server-only imports (database clients, secrets, server actions the client cannot reach),
+third-party endpoints, and scraping the app's own DOM when a data path exists are not call paths.
 
-**Privileged mutations:** a route that enforces authn/authz only by hiding a client button is not a safe path — wrapping it exposes the mutation to any agent. Wrap a privileged write only when its route enforces authorization **server-side**; otherwise list it as `needs developer wiring`.
+**Privileged writes:** a route that enforces authorization only by hiding a button in the client is
+not a safe path, because wrapping it exposes the write to any agent. Wrap a privileged write only
+when its route authorizes the request server-side; otherwise list it as *needs developer wiring*.
 
-**No safe client path for a journey → list it in the plan as `needs developer wiring`. Never fake it** with invented data or a dead call.
+**No safe client path for a user-agent journey →** list it in the plan as *needs developer wiring*,
+with the reason. A tool returning invented data, or calling something that cannot work, covers nothing.
 
-## Registration placement (stack-neutral — no stack is privileged)
+## Placement — registration scopes and entry modules
 
-| stack | everywhere-tools | contextual tools | auth/state-conditioned |
-|---|---|---|---|
-| **React SPA / Vite** | one provider component at app root; `useEffect(() => { const reg = registerTools([...]); return () => reg.unregister(); }, [])` | per-route/per-page component; `useEffect` keyed on the route/params so it re-registers with the current entity baked in | effect keyed on the session/cart state the app already exposes; register on state-true, `reg.unregister()` on state-false |
-| **Next App Router** | a `"use client"` registrar component mounted in the root `layout.tsx` | per-page `"use client"` component that bakes in the page's params | registrar reads the client session hook; effect deps include auth/role |
-| **Server-templated MPA / static (PHP, etc.)** | a `<script type="module">` include in the shared layout that calls `registerTools` on load | per-template page module included only on the relevant templates | conditionally include the script by the server-rendered auth state, or gate inside it on a client session check |
+Resolve, while planning, the exact workspace-relative path of each registration scope's entry module
+and of each tool's module. In an Explorer run they become `plan.json.entry_module` and each
+suggestion's `source_module`; in a chat or non-interactive run they are written into the plan.
+Generation, review and Connect reuse exactly these paths.
 
-Auth/state-conditioned registration is an effect on the app's **existing** session/cart/role state: register when the condition is true, `unregister()` when it goes false. A registration left live past its valid target is a broken contract.
+| stack | everywhere and page-scoped tools | state- and auth-gated tools |
+|---|---|---|
+| **React SPA / Vite** | one provider component at the app root registers them in a `useEffect`; page-scoped tools carry `pages` | a component whose effect is keyed on the app's existing session, role or cart state |
+| **Next App Router** | a `"use client"` registrar mounted in the root `layout.tsx`; page-scoped tools carry `pages` | the registrar reads the app's client session hook; its effect depends on auth and role |
+| **Server-templated pages / static** | a `<script type="module">` in the shared layout registers on load | include the script only for the server-rendered auth state, or gate inside it on the client session |
 
-## Confidence rule (decided vs needs-your-input)
-Every tool passes through the Phase-D plan review regardless. Within the plan, mark each tool:
+Code for each shape is in `references/codegen.md`.
 
-- **decided** — BOTH hold: (a) the journey is a **must-have of the matched category**, AND (b) a **rung-1 or rung-2** wiring path exists with **corroborating evidence** — the route, its handler, and a UI element all agree on the same operation.
-- **needs your input** — anything else: ambiguous domain semantics, competing flows for the same journey, a great-to-have, an uncertain category match, or only a rung-3/4 path. State a **specific question** and a **stated default** so the developer can approve fast or redirect.
+## Confidence rule: decided or needs your input
+
+Every tool is in the reviewed plan. Within it, mark each tool:
+
+- **decided** — both hold: (a) its user-agent journey is a must-have for this site, and (b) a rung-1
+  or rung-2 path exists with **corroborating evidence**: the route, its handler and a UI element all
+  agree on the same operation.
+- **needs your input** — anything else: ambiguous domain meaning, competing flows for the same
+  user-agent journey, a great-to-have, an uncertain kind of site, or only a rung-3/4 path. Give a
+  **specific question** and a **stated default**, so the developer can approve fast or redirect.

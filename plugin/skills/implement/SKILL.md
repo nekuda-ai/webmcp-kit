@@ -1,62 +1,149 @@
 ---
 name: implement
-description: Add WebMCP tools to a website codebase so browser agents can act through the site's own logic instead of scraping the page. Use when asked to make a site agent-ready, add WebMCP or document.modelContext tools, or implement site tools with @nekuda/webmcp-sdk.
+description: Add WebMCP tools to a website codebase so browser agents can act through the site's own logic instead of scraping the page. Use when asked to make a site agent-ready or WebMCP-ready, add WebMCP or document.modelContext tools, or implement site tools with @nekuda/webmcp-sdk.
 argument-hint: "[request] [--non-interactive | --no-interactive-loop]"
 ---
 
 # WebMCP Kit — implement
 
-## Mission
-- WebMCP hands a browser agent typed tools (via the `@nekuda/webmcp-sdk` SDK) so it answers from the site's own content and acts through the site's own logic. User and agent share the visible page — every tool produces a visible effect.
-- Tools answer "what will a visitor ask, and ask for, here?" — journeys, never REST-endpoint wrappers.
-- In every human-facing run, the plan you present in Phase D is approved by the developer **before any file is written**. That gate is the product, not a formality.
+WebMCP lets a page hand a browser agent typed tools: the agent lists the page's tools and calls
+them instead of reading the screen and clicking, and each call runs in the visitor's tab through the
+site's own code. You add those tools to this repo with `@nekuda/webmcp-sdk`.
 
-## Hard rules
-- **Source analysis and code stay local.** Never send customer code or routes to an external service, and never send anything to an unauthenticated tool/API. The one exception is the separately approved publish step in `references/connect.md`, which sends the approved tool descriptions and input schemas — never a handler body, a route file, or a credential — to the authenticated API the developer just connected to. The tool-selection rubric is this skill's text — there is no hosted scanner. The optional post-build Connect flow sends only the CLI's structured project/account request described in `references/connect.md`; it is separate from the SDK's documented default-on anonymous observations, which are independent of Connect.
-- **Client-reachable wiring only.** `execute` may use the app's own client data layer, same-origin routes, or client-safe actions — never server-only imports, secrets, third-party endpoints, or DOM-scraping when a data path exists.
-- **Flag, don't fake.** A journey with no safe client path is listed as *needs developer wiring* — never invented data or a dead call. A guidance-only stub does not "cover" a must-have.
-- **Irreversible/cost-bearing writes need a boundary.** A payment, cancellation, or delete must not complete in one agent call. The generated tool stops at a reversible handoff — creates the repo-native pending state (checkout session, pending order, prepared cancellation) and hands the final step to the app's own payment/confirm UI, or uses a prepare→confirm two-call shape. A consequence sentence in the description is not a boundary.
-- **Authorization is the server's job.** Registration gating on auth/role is UX, not security. Only wrap a privileged mutation whose route independently enforces authn/authz server-side; an endpoint that trusts a hidden client button is *needs developer wiring*, not a tool.
-- **No changes or Connect before approval.** No branch, file, dependency, or Connect attempt until the developer approves the plan, except the tool-generation workflow in explicit `--non-interactive` mode; that exception permits the branch, files, and dependencies needed for generation but never Connect, which non-interactive mode skips. This skill reads with Read/Grep/Glob during A–C — plus one read-only exception: the Phase-F baseline capture (the repo's own typecheck/build, `references/verify.md`) may run as a background task before approval, because it writes nothing to the tree; after approval it requests the write, package-manager, and browser permissions it needs through the normal permission prompts — no mutation is pre-authorized. Interactive Connect is a separate, optional post-build decision (`references/connect.md`).
-- **SDK only.** Generated code imports `defineTool` / `registerTools` from the SDK under its resolved name (the installed package's declared name — `references/sdk.md`); never the raw `modelContext` surface, never a bundled polyfill/shadow. The SDK pins the spec, resolves whichever surface the browser exposes, and no-ops when unsupported.
+## What good looks like
 
-## Session flow (A–F)
+- Tools carry the site's **user-agent journeys**: the goals a visitor asks an agent to accomplish
+  here, never a wrapper per endpoint.
+- `ask_site` on every site, answering questions about the site and where things live.
+- Acting tools do what the UI does, so the visitor sees it. **Writes complete**, and the browser
+  agent asks the visitor first; a **handoff** happens only where the site itself needs the visitor
+  (entering a card, signing in).
+- Every call goes through the app's own client path. A user-agent journey with no safe path is
+  reported as *needs developer wiring*.
+- The repo's own build, lint and typecheck pass, and each tool is proven in a browser on its pages
+  and auth states.
 
-**A — Understand the repo** (cheap-first). Stack ID from manifests (`package.json`, `composer.json`, …): framework, rendering mode (SPA/SSR/MPA/static), router, language, package manager, and whether a JS bundler/dependency install even exists (a PHP/static MPA may have none — see `references/codegen.md`). Read high-signal sources before app code: README, `openapi.yml`/swagger, route manifests (`app/`, `pages/`, routes files), sitemap, nav, homepage CTAs. Map the visitor surface — routes→pages, forms, data-layer calls, auth boundaries — recording for each: file, what it does, client-reachable or server-only. **Inventory any existing `@nekuda/webmcp-sdk` usage — including its legacy aliases `@agentlane/webmcp` and `@nekuda/webmcp`, the same SDK** (`defineTool` names and `stableKey`s) so a re-run preserves identity instead of churning it. No stack is privileged (Next.js is not pre-decided); read deeper only where a candidate tool's wiring stays ambiguous. These sweeps are independent of each other: issue their Reads/Greps as one parallel batch, never one file per turn, and where the host supports parallel subagents, fan out the route map, the data-layer/auth survey, and the existing-SDK inventory and merge the results — serial reading is this phase's dominant cost on a large repo.
+## Guardrails
 
-**B — Select journeys/tools.** Load `references/journeys.md` and `references/wiring.md` together, in one batch — C's confidence rule decides whether a B journey lands decided, so the two are used jointly. Match the repo to a category by `applies_when` → primary (+ secondary with the hybrid downgrade). **No match → tell the customer; never draft against the nearest category.** Simulate a concrete visitor on concrete pages: the questions they ask and actions they request are the spec. Instantiate the matched template's must-haves to this repo's real domain objects, content, and CTAs (a "book a demo" site gets `book_demo`, not `request_quote`). `ask_site` wherever the site has visitor-facing content to answer from — one instance; if there is genuinely none (e.g. an auth-only internal dashboard that matches no category), don't fabricate a content bundle, say so. Stay in the category's count band and global 3–10; thin-content sites get `ask_site` and stop. Fix availability, context, response, and annotations per tool.
+- **Local.** Source analysis stays on this machine. What leaves it is Connect's account request and,
+  when separately approved, the approved tool descriptions (`references/connect.md`): never code,
+  routes or credentials.
+- **The gate.** In a human run, nothing of the developer's (file, dependency, branch, Connect) is
+  written before they approve the plan. The exceptions are `.webmcp/` review state and the
+  read-only baseline checks.
+- **SDK only.** Generated code calls `defineTool` and `registerTools`, never `document.modelContext`.
+- **Authorization stays server-side.** Gating a tool by sign-in or role is presentation; a
+  privileged write is wrapped only when its route authorizes the request on the server.
 
-**C — Pick the wiring.** (`references/wiring.md` is loaded with B; load it now if it is not.) For each tool take the highest safe rung (client data layer > same-origin route > client action > content bundle) and name the concrete path. Resolve the exact workspace-relative entry-module path for the registration scope and exact workspace-relative source-module path for each tool now. Explorer runs record them in `plan.json.entry_module` and each suggestion's `source_module` before proposal; chat-only runs include the same exact paths in the Phase-D plan presented in the conversation without creating Explorer state. Reuse those approved paths through generation, feedback, and Connect. Confidence rule: a tool is **decided** only if its journey is a category must-have AND a rung-1/2 path exists with corroborating evidence (route + handler + UI element agree). Anything else — ambiguous semantics, competing flows, great-to-haves, uncertain category — is **needs your input** with a specific question and a stated default. Per-tool evidence gathering (route + handler + UI element) is independent across tools — batch or fan it out exactly as in Phase A.
+## Review mode
 
-**D — Review the plan (hard gate).** Load `references/plan-template.md`. Open every human-facing review with a short summary, identical in substance across entry modes, of what the skill will do and which tools it will create; on the loop path, it is the `_chat.ndjson` handoff (Propose, `references/interactive.md`) shown in the Explorer's conversation panel — the terminal message just points the developer to the Explorer. Then present the plan in the selected review surface **before touching any file**; tool descriptions ship verbatim (description is the product). Edits → revise → re-present. Proceed only on explicit approval, collected per `references/decisions.md`. In `--non-interactive` mode, use the stated defaults and Degrade path instead.
+Settle it from the invocation, before step 1:
 
-**E — Generate.** Load `references/codegen.md` and `references/sdk.md` in one batch — the latter for the exact SDK surface and wiring. Add the SDK dependency the way `references/sdk.md` prescribes, starting the install as a background task at approval so writes never wait on it (`references/codegen.md`); emit the two-module shape as **separate files** — each side-effect-free tool module at its recorded `source_module` (`defineTool` at module scope, never inside a component/effect) plus one entry module per registration scope. An unbundled browser-served module may not keep the package's bare import: vendor the SDK behind a relative browser URL before approval. An import map is not sufficient because static review cannot prove that the server's CSP header permits its inline script. `stableKey` is `domain.action`, authored once and **never changed on re-runs** (reuse any inventoried in Phase A; never a copy of the wire `name`) — `name` may change freely. Each `description` states what it does, **when to use it**, and what it returns; `inputSchema` sets `additionalProperties: false`. `execute` runs the Phase-C path verbatim and **throws on failure or missing anchors/data** (never succeed-on-missing) — a read that finds nothing is not a failure: it still returns, with the empty result plus an explicit note field saying the site has no matching content, never a bare empty array. Match the repo's language, lint/format config, and file conventions. **If an approved call path proves unusable or the implementation must deviate from the approved plan** (different endpoint, changed behavior or coverage), stop and re-present the change — never silently substitute under a stale approval. Start Phase F's static checks (typecheck/lint/build) after this first write, not only once every file is written — preferably a watch-mode typechecker as a background task (`references/verify.md`), so per-file checks are incremental — a turn-budget cutoff should still land at least one static pass.
+- **Interactive** (the default): the plan is reviewed in the Explorer, a local browser page
+  (`references/interactive.md`). With `--no-interactive-loop`, or when the developer prefers chat,
+  the review happens in chat, with every decision collected per `references/decisions.md`.
+  The Explorer runs from the installed WebMCP Kit plugin. When this skill came from the AgentLane
+  MCP (no `interactive/` folder beside this file), tell the developer the Explorer needs the
+  plugin (`/plugin marketplace add nekuda-ai/webmcp-kit`, then `/plugin install webmcp-kit@nekuda`;
+  Codex: `codex plugin marketplace add nekuda-ai/webmcp-kit`, then `codex plugin add webmcp-kit`),
+  and review in chat.
+- **Non-interactive:** `--non-interactive`, or a request that says in plain words to go ahead
+  without review ("just go ahead"). Only the flag or the request's own words make a run
+  non-interactive; then `references/non-interactive.md` governs the review.
+- **Resume:** a request to reopen or continue a run whose `.webmcp/` holds state follows the resume
+  rules in `references/interactive.md`.
+- A human run whose gate nobody answers stops there.
 
-**F — Verify.** Load `references/verify.md`. Run the ladder: static → boot → registration on declared pages/auth states → read-only invocation → state-changing only on seeded/dev data with consent. Every tool ends **verified**, **failed**, or **could-not-verify**. Failed blocks the PR (fix or drop — never ship known-broken); could-not-verify ships flagged. After the ladder, load `references/connect.md` for every human run: use the Explorer decision when its loop is active and the agent conversation for chat-only review. Its plugin-root CLI entry is mandatory, with no PATH-installed CLI assumption. Only explicitly headless or `--non-interactive` paths skip Connect. That file also carries the second optional decision it unlocks — publishing the approved tool descriptions to the catalog, offered only after a healthy connection, sending descriptions and never code or credentials.
+## The flow
 
-**PR.** Branch `webmcp/tools-v0`; conventional commit; open a PR (approved plan + per-tool verification table as the body) via `gh` when available, else commit on the branch and hand over. Restate could-not-verify items and needs-developer-wiring journeys in the summary, and — when Connect finished healthy — the dashboard link from `references/connect.md`'s hand-over step.
+Each step ends on its **Done when**. Load a step's references when the step starts, issue
+independent reads and checks as one batch, and fan out to subagents where the host supports it.
 
-**Star ask (human runs only).** After the PR link (or the committed branch) has been handed over — the run's value is delivered, never before — append one non-blocking line to the closing summary: if WebMCP Kit was useful, a star at https://github.com/nekuda-ai/webmcp-kit helps other developers find it. That link is the whole ask: never star on the user's behalf, never run `gh` or call the GitHub API for it — the kit does not use the user's GitHub credentials. Mention it at most once per run, and skip it entirely when the run is `--non-interactive`.
+### 1. Understand the site
 
-## Entry and review mode
-- Headless intent must be explicit: the `--non-interactive` flag in the invocation or an equally explicit standing instruction in the request text (for example, "proceed without approval" or "non-interactive") counts as that flag. Never infer it from the environment (no TTY sniffing or "seems headless"). A request to reopen or continue an existing run (a `.webmcp/` folder with state) → see **Resume**. A request with neither loads `references/interactive.md` and runs D–F as an interactive browser loop over the git-tracked state folder `.webmcp/` — UI phases propose → build → review → verify → done: approval starts `verify`, and `done` starts only after the PR exists. If the loop is not already running, the agent may offer to start it (a decision per `references/decisions.md`). Codex uses bundled hooks only when `/hooks` lists them; their automatic run binding is same-task only, with manual replay as the fallback. Claude Code may use Monitor where supported. In every path the skill remains the workflow authority.
-- Developer declines the browser loop → continue as `--no-interactive-loop` with chat-only review.
-- Bun unavailable (the Startup preflight in `references/interactive.md`) → offer install or chat-only review per that preflight, collected per `references/decisions.md`; never infer either choice, and never read missing Bun as non-interactive intent.
-- `--no-interactive-loop` → human, chat-only: show the Phase-D summary and plan in chat, then collect approval per `references/decisions.md`. Do not start the browser loop.
-- `--non-interactive` → explicit headless: skip the browser loop and use the gate-free Degrade path below.
-- If nobody answers the gate and no explicit non-interactive intent was given, stop; inference may never skip the gate.
+Read cheap-first: the manifests (framework, rendering, router, language, package manager); the
+repo's own docs and scripts (README, `AGENTS.md` or contributing guide, package scripts) for how it
+installs, builds, lints, typechecks, tests and runs; then the visitor surface: routes → pages,
+forms, the client data layer, auth and roles, the content. Find every existing `defineTool` and its
+`stableKey`, so a re-run keeps them; WebMCP tools the site already registers without the SDK are
+the `connect-existing-tools` skill's job, so say so before building beside them. Start the baseline
+checks as a background task (`references/verify.md`). WebMCP itself: `references/webmcp.md`.
 
-## Resume
-- In the same agent task/session, validate `.webmcp/.run.json` v1 for this canonical workspace and call its run-aware `/healthz?capability=...&run_id=...`. If live, reprint `/?capability=...&run_id=...`, restore that task's available Codex-hook or Claude-Monitor wake path from `references/interactive.md` (otherwise use same-task manual replay), then scan valid current-run envelopes without a handled ack in numeric `order`.
-- In the same task, a valid run with a dead server may use `server.ts <workspace> --resume`; use only its printed URL/runtime metadata, restore the same task's delivery, reconcile partial effects, and continue. Runtime metadata absent/invalid means there is no safely resumable identity.
-- A fresh task does not inherit the old run's automatic hook binding. It may reconcile current unacked envelopes manually. For continued automatic browser interaction, explicitly rotate per `references/interactive.md`: shut down a live old server or abandon dead runtime metadata, then use normal `server.ts <workspace>` without `--resume` and establish the new task's own run/session. Socket delivery and hook claims are hints; matching journal envelopes plus `_ack.ndjson` remain the truth.
+**Done when** you can name what the site is for, who uses it (anonymous, each signed-in role), every
+page kind with its route file, the client data layer each visitor action goes through, and the
+repo's own command for every check and for running it.
 
-## Degrade paths
-- No category match → say so; do not force a weak fit.
-- Most must-haves unwireable → **proposal-only** is a legitimate terminal outcome: deliver the reviewed plan, no code, and say why. That is benchmark signal, not failure.
-- Explicit `--non-interactive` → proceed automatically: record the plan verbatim as the PR body/summary, implement each needs-your-input item on its stated default, and restate each in the summary as an assumption — the question, the default taken, and why.
-- No runnable browser → mark tools could-not-verify and still ship plan-conformant code.
+### 2. Choose user-agent journeys
 
-## Environment
-- If the working directory ships its own site runbook (lifecycle commands, base URL, test identities — e.g. an eval capsule), use it for boot/reset; otherwise use the repo's own scripts. Never assume a harness exists.
-- Browser verification needs WebMCP active: Chrome 150+ flag or `@mcp-b/webmcp-polyfill` — recipe in `references/verify.md`.
+Load `references/journeys.md`. Put concrete visitors on concrete pages; what they ask and ask for is
+the spec.
+
+**Done when** each user-agent journey names its visitor, its goal and the page it starts on,
+`ask_site` is among the tools, and every must-have user-agent journey has a tool or a *needs
+developer wiring* reason.
+
+### 3. Plan
+
+Load `references/tool-roles.md`, `references/wiring.md` and `references/plan-template.md` together.
+Give each tool its role, name, description, inputs, answer, page effect, annotations, where it lives,
+and its wiring: the highest safe rung, as a concrete path in this repo. Resolve the entry-module
+path of each registration scope and the module path of each tool.
+
+**Done when** every tool has every plan-template line filled from this repo's real code, and every
+open question carries a stated default. When most must-have user-agent journeys have no safe path,
+the plan itself is the deliverable: proposal only, with the reason.
+
+### 4. Review
+
+With the plan ready, open the review with a short summary of what will be built, then present the
+plan in the chosen surface: the Explorer (`references/interactive.md`), chat
+(`references/decisions.md`), or none (`references/non-interactive.md`). Edits → revise → present
+again.
+
+**Done when** the developer explicitly approves (free text is an edit or a question, never
+approval), or, in a non-interactive run, the plan is recorded with its defaults as assumptions.
+
+### 5. Generate
+
+Load `references/codegen.md`. At approval, start the SDK install and the dev server as background
+tasks; write each tool module at its planned path and the entry module last. Descriptions ship
+verbatim from the plan. A planned path that proves unusable, or any change to what a tool does, goes
+back to review before it is written (non-interactive: recorded beside the plan).
+
+**Done when** every approved tool and its entry module exist at their planned paths, the repo
+records the SDK (in its lockfile, or as the copied built file on a site with no bundler), and the
+repo's static checks pass against the baseline.
+
+### 6. Verify
+
+Load `references/verify.md` and climb the ladder: static → boot → registration per page and auth
+state → read-only calls → writes on seeded data.
+
+**Done when** every tool is verified (with its rung), failed, or could-not-verify, and every failed
+tool is fixed or dropped.
+
+### 7. Connect
+
+Human runs, or a non-interactive run whose request asks for it (`references/non-interactive.md`).
+Load `references/connect.md`: offer Connect, then, after a healthy connection, the
+separate offer to publish the approved tool descriptions. Declining changes nothing about the tools.
+The SDK's anonymous usage observations run either way; Connect ties them to the developer's account.
+Every account step is a tool on the AgentLane MCP server that ships with this plugin, signed in once
+through the AI app; the kit has no login of its own. To read that account from the terminal
+afterwards (the Projects, failed agent calls), the `nkd` CLI per `references/nkd.md` also works.
+
+**Done when** the developer has chosen, and a healthy connection's dashboard links are ready.
+
+### 8. Hand over
+
+Commit what the change needs on the branch `webmcp/tools-v0` (a conventional commit; build
+byproducts such as `*.tsbuildinfo` and build output stay out), and open a PR via `gh` when it is
+available, else hand over the branch. The PR body is the approved plan plus the per-tool
+verification table. The closing summary restates the could-not-verify items and the user-agent
+journeys that need developer wiring, and gives the dashboard links when Connect finished healthy.
+
+In a human run, the closing summary ends with one line, once: if WebMCP Kit was useful, a star at
+https://github.com/nekuda-ai/webmcp-kit helps other developers find it. The link is the whole ask:
+the developer stars it themselves, and the kit never touches their GitHub credentials.
+
+**Done when** the PR (or the committed branch) and its summary are in the developer's hands.

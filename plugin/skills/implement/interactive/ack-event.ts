@@ -107,6 +107,19 @@ function lockOwnerAt(path: string): LockOwner | null {
   }
 }
 
+function lockIdentity(): { key: string; regular: boolean } | null {
+  try {
+    const stat = lstatSync(lockFile);
+    return {
+      key: [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, stat.mode].join(":"),
+      regular: stat.isFile() && !stat.isSymbolicLink(),
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function processExists(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -135,15 +148,16 @@ async function acquireLock(): Promise<void> {
     }
     const observed = lockOwnerAt(lockFile);
     if (!observed) {
-      try {
-        if (lstatSync(lockFile).isFile() && !lstatSync(lockFile).isSymbolicLink()) {
-          throw new Error(".webmcp/.ack.lock has invalid contents");
-        }
-        throw new Error(".webmcp/.ack.lock is not a valid regular lock file");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-        throw error;
-      }
+      // A holder releasing (or a claimant linking) mid-read also yields null, so refuse only
+      // a lock that is still the same file and still unreadable after a short pause.
+      const before = lockIdentity();
+      if (before === null) continue;
+      await Bun.sleep(20);
+      if (lockOwnerAt(lockFile) !== null) continue;
+      const after = lockIdentity();
+      if (after?.key !== before.key) continue;
+      if (after.regular) throw new Error(".webmcp/.ack.lock has invalid contents");
+      throw new Error(".webmcp/.ack.lock is not a valid regular lock file");
     }
     const age = Date.now() - observed.created_at_ms;
     const expired = age > ACK_LOCK_MAX_AGE_MS || age < -ACK_LOCK_MAX_AGE_MS;

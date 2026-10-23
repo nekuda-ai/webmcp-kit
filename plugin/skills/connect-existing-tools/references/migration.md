@@ -9,7 +9,7 @@ Goal: the same tools, registered through `@nekuda/webmcp-sdk`, behaving identica
   so omitting it silently renames the tool for every agent that already calls it.
 - `stableKey` follows `stable-keys.md`. An existing one is immutable.
 - `source: "merchant_authored"` on adopted definitions.
-- Every `registerTools` batch this skill writes passes `{ tracking: { builtWith: "webmcp-kit/connect-existing-tools@<version>" } }`, `<version>` replaced by this plugin's manifest version (read whichever host manifest ships beside these skills: `.claude-plugin/plugin.json`, else `.codex-plugin/plugin.json`) — the same rule as `implement`'s `references/codegen.md`, with this skill's name in the stamp so a migrated site and a generated one stay distinguishable. It is how the platform tells a site the Kit migrated from one a developer wired by hand; a batch without it is invisible as Kit work.
+- Every `registerTools` batch this skill writes passes `{ tracking: { builtWith: "webmcp-kit/connect-existing-tools@<version>" } }`, `<version>` replaced by this plugin's manifest version (read whichever host manifest ships beside these skills: `.claude-plugin/plugin.json`, else `.codex-plugin/plugin.json`; when this skill came from the AgentLane MCP, none ships beside it and `<version>` is `mcp`) — the same rule as `implement`'s `references/codegen.md`, with this skill's name in the stamp so a migrated site and a generated one stay distinguishable. It is how the platform tells a site the Kit migrated from one a developer wired by hand; a batch without it is invisible as Kit work.
 - Registration moves into `registerTools` batches at the entry-module seam — one entry module per
   registration scope, exactly as the `implement` skill's two-module shape describes.
 - A duplicate `name` or `stableKey` within a batch is a hard SDK error. Resolve it with the
@@ -19,10 +19,9 @@ Goal: the same tools, registered through `@nekuda/webmcp-sdk`, behaving identica
 
 ## Order of work
 
-1. Install the SDK per the `implement` skill's `references/sdk.md` — the **resolved name** rule
-   applies here too, and a workspace that already vendors the SDK under a legacy alias keeps that
-   alias. Start the install as a background task; the rewrites below do not need it, only the first
-   typecheck does.
+1. Install the SDK per the Install section of the `implement` skill's `references/codegen.md`; a
+   workspace that already depends on the SDK keeps that dependency. Start the install as a
+   background task; the rewrites below do not need it, only the first typecheck does.
 2. Rewrite case-2 definitions (below), one file at a time, leaving handlers untouched.
 3. Move registration to the entry-module seam.
 4. Delete the now-dead native registration calls — and nothing else.
@@ -148,11 +147,10 @@ a correct outcome, not a failed one.
 ## Connect
 
 Connect is not re-specified here. It defers to the `implement` skill's
-`references/connect.md` — login, provisioning, the readiness gate, the entry-module seam edit, and
-the rule that a non-interactive run skips it. Read that file, and follow it as written, with the
-one multi-scope amendment stated below — and pass `--skill connect-existing-tools` where its step 2
-says `--skill implement`, so the platform's Connect record names this skill. Its `--entry` is the
-recorded entry module of the registration scope that run covers.
+`references/connect.md` — the sign-in check, the project and key, the readiness gate, the
+entry-module seam edit, and the rule that a non-interactive run skips it. Read that file, and
+follow it as written, with the one multi-scope rule stated below. Its entry module is the recorded
+entry module of the registration scope that run covers.
 
 **Order is mandatory:** finish Phase E's behavior diff and idempotency check (section 1 of
 `verify-connection.md`) before starting Connect. A connection is never configured on a migration
@@ -172,21 +170,12 @@ and reports the rest as **connected** is claiming attribution for tools whose ba
 `tracking` at all: those tools send nothing to the collect endpoint, so nothing later contradicts
 the claim. Scopes left unconnected are reported **migrated, not attributed**.
 
-**The amendment: scope each run's success gate to the scope it connected.** `connect.md` step 5
-reads success off the CLI status report's **top-level** `tracking_api_key_present`,
-`tracking_api_key_matches` and `tracking_endpoint_matches`. Those fields are computed across
-*every* `registerTools` batch the CLI finds anywhere in the workspace, which is the right gate for
-a single-scope site and the wrong one here: after the first of two scopes is written, the second
-scope's batches still carry no `tracking`, so all three read false, step 6 restores the first
-scope's bytes, and no run can ever leave any scope connected. Read the per-batch
-`registration_batches[]` array instead, and for each run require, of exactly the batches whose
-`path` equals the entry module that run approved: `tracking_api_key` true,
-`tracking_api_key_matches` true, `tracking_endpoint_matches` true. Everything else in step 5 —
-the same tools registering, no `key_revoked` flag, the reload and the re-run of the registration
-rung — is unchanged, and so is step 6's rollback on failure, which still restores only that run's
-entry module. The top-level three are the **final** check, after the last scope: they are what
-distinguishes "every scope connected" from "the ones we got to". On a site with exactly one
-registration scope the two gates are the same check, so follow `connect.md` as written.
+**Each run's success gate covers the scope it connected.** `connect.md` step 5 checks the batches
+of the one entry module that run approved, so after the first of two scopes is written, the second
+scope's batches (still without `tracking`) do not fail the first run, and step 6's rollback restores
+only that run's entry module. After the last scope, check every recorded entry module once more:
+every batch carries the same key, and that key is `enabled` in `mcp:publishable_keys_list`. That
+final check is what distinguishes "every scope connected" from "the ones we got to".
 
 ## Rollback
 

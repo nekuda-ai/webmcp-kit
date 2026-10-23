@@ -3,6 +3,7 @@ import argparse
 import json
 import re
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -20,6 +21,30 @@ def parse_args() -> argparse.Namespace:
         help="write the ZIP here instead of dist/webmcp-kit-<version>.zip",
     )
     return parser.parse_args()
+
+
+def publish_ignored() -> set[str]:
+    """Tracked plugin paths a .publishignore keeps out of every release.
+
+    Only the plugin's development home carries plugin/.publishignore; the published tree
+    is already filtered and has none. Git's own matcher reads it, so the rules work
+    exactly like .gitignore, relative to the directory of each .publishignore.
+    """
+    if not (plugin / ".publishignore").is_file():
+        return set()
+    command = [
+        "git",
+        "ls-files",
+        "-z",
+        "--cached",
+        "--ignored",
+        "--exclude-per-directory=.publishignore",
+    ]
+    try:
+        listed = subprocess.run(command, cwd=plugin, check=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f"plugin/.publishignore needs a git checkout: {error}") from error
+    return {path for path in listed.stdout.decode("utf-8").split("\0") if path}
 
 
 def runtime_references(source: str) -> set[str]:
@@ -68,19 +93,29 @@ def main() -> None:
     args = parse_args()
     manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
 
-    if any(field in manifest for field in ("mcpServers", "apps")):
-        raise SystemExit("Skills-only packages cannot include MCP or app configuration")
+    if "apps" in manifest:
+        raise SystemExit("Skills-only packages cannot include app configuration")
     if "screenshots" in manifest.get("interface", {}):
         raise SystemExit("Skills-only packages cannot include screenshots")
 
     manifest.pop("hooks", None)
+    # The plugin's MCP server (`.mcp.json`) is not part of a skills-only bundle: an app that
+    # loads it reaches AgentLane through its own connector, and the skills say what to do
+    # when the `agentlane` tools are missing.
+    manifest.pop("mcpServers", None)
     output = args.output or root / "dist" / f"{manifest['name']}-{manifest['version']}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
+
+    ignored = publish_ignored()
+
+    def unpublished(directory: str, names: list[str]) -> set[str]:
+        relative = Path(directory).relative_to(plugin)
+        return {name for name in names if (relative / name).as_posix() in ignored}
 
     with tempfile.TemporaryDirectory() as temporary:
         bundle = Path(temporary) / manifest["name"]
         for directory in ("skills", "assets", "cli", "scripts"):
-            shutil.copytree(plugin / directory, bundle / directory)
+            shutil.copytree(plugin / directory, bundle / directory, ignore=unpublished)
         manifest_dir = bundle / ".codex-plugin"
         manifest_dir.mkdir()
         (manifest_dir / "plugin.json").write_text(json.dumps(manifest, indent=2) + "\n")

@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "agentlane": { "type": "http", "url": "https://api.nekuda.ai/mcp" }
+  }
+}

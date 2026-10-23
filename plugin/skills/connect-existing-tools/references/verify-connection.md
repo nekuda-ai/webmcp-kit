@@ -71,7 +71,7 @@ this section then verifies that configuration and its runtime attribution.
 Attributed arrival is the claim, not "a request was sent". Anonymous observations are on by
 default before anything is connected, so their presence proves nothing about this step.
 
-The proof has three parts: the CLI's healthy status flags, a ready edge verification, and one real
+The proof has three parts: the configured seam with its key enabled, a ready edge verification, and one real
 invocation whose beacon is observed **arriving at the configured endpoint** and drawing
 **no rejection message in the browser console**.
 
@@ -84,11 +84,11 @@ Observe the keyed request first; only then does silence mean the key was accepte
 
 ### The three parts, in order
 
-1. **Configuration** — the CLI's own status report for this workspace, read as JSON, never scraped
-   from prose. It must show the tracking configuration present and matching, the endpoint matching,
-   the online check performed, and the key enabled, with no revoked advisory. This proves the seam
-   is wired; it proves nothing about the browser.
-2. **Readiness** — the Connect result's `edge_verification: "ready"`. This proves the far side
+1. **Configuration** — every `registerTools` batch of this scope's entry module carries the same
+   `tracking.apiKey` (and the endpoint `connect.md` step 4 chose), and `mcp:publishable_keys_list`
+   shows that key `enabled` and not revoked. This proves the seam is wired; it proves nothing about
+   the browser.
+2. **Readiness** — the key answer's `edge_ready: true` from `mcp:publishable_keys_create`. This proves the far side
    accepted the site's registration; it proves nothing about the page the visitor loads.
 3. **Runtime** — load a declared page **of this registration scope**, invoke one real tool, and
    observe both:
