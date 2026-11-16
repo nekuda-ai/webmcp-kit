@@ -139,10 +139,12 @@ Do not rewrite. Do not import the third-party SDK and "adapt" it. Do not reconst
 a schema the browser reported. The report for each is three lines: the wire name, where it lives
 (file and line, or *browser-observed only*), and the reason it cannot be connected automatically —
 an unrecognized registration path, or no locatable defining source. Then the one thing the developer
-can do about it: point at the source, or migrate it by hand using the case-2 recipe above.
+can do about it: point at the source, or migrate it by hand using the case-2 recipe above. The Kit's
+own answer for them is the tracking-only install (`tracking-only.md`), which reports them with no
+rewrite; offer it in the Phase-C plan.
 
-A run whose entire finding list is cases 3 and 4 ends with that report and nothing written. That is
-a correct outcome, not a failed one.
+A run whose entire finding list is cases 3 and 4, and whose developer declines the tracking-only
+install, ends with that report and nothing written. That is a correct outcome, not a failed one.
 
 ## Connect
 
@@ -150,7 +152,8 @@ Connect is not re-specified here. It defers to the `implement` skill's
 `references/connect.md` — the sign-in check, the project and key, the readiness gate, the
 entry-module seam edit, and the rule that a non-interactive run skips it. Read that file, and
 follow it as written, with the one multi-scope rule stated below. Its entry module is the recorded
-entry module of the registration scope that run covers.
+entry module of the registration scope that run covers. To disconnect a deployment or remove the
+project later, follow that file's *Disconnect or remove a project*.
 
 **Order is mandatory:** finish Phase E's behavior diff and idempotency check (section 1 of
 `verify-connection.md`) before starting Connect. A connection is never configured on a migration

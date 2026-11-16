@@ -6,6 +6,7 @@ import {
   lstatSync,
   openSync,
   readFileSync,
+  type Stats,
   writeSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -104,7 +105,9 @@ function boundedString(
 ): value is string {
   if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > maxBytes) return false;
   if (!options.allowEmpty && value.trim().length === 0) return false;
-  if (options.identifier && (value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value))) return false;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: an identifier refuses them
+  if (options.identifier && (value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)))
+    return false;
   return true;
 }
 
@@ -228,7 +231,8 @@ export function parseRecordedEnvelope(value: unknown): RecordedEnvelope | null {
 }
 
 export function readRegularText(path: string, maxBytes = Number.POSITIVE_INFINITY): string | null {
-  let before;
+  let before: Stats;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     before = lstatSync(path);
     if (!before.isFile() || before.isSymbolicLink() || before.size > maxBytes) return null;
@@ -237,6 +241,7 @@ export function readRegularText(path: string, maxBytes = Number.POSITIVE_INFINIT
   }
   portablePathTestBarrier("read", path);
   let fd: number | undefined;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     fd = openSync(path, constants.O_RDONLY | noFollowFlag());
     const after = fstatSync(fd);
@@ -263,7 +268,7 @@ export function appendDurable(
 ): void {
   const buffer = Buffer.from(`\n${JSON.stringify(value)}\n`, "utf8");
   for (let attempt = 0; attempt < 8; attempt++) {
-    let before;
+    let before: Stats;
     try {
       before = lstatSync(path);
       if (!before.isFile() || before.isSymbolicLink()) {
@@ -312,7 +317,8 @@ export function appendDurable(
       // platforms that provide it.
       if (fstatSync(fd).size + buffer.length > maxBytes) throw new AppendLimitError();
       const written = writeSync(fd, buffer, 0, buffer.length);
-      if (written !== buffer.length) throw new Error(`short write (${written}/${buffer.length} bytes)`);
+      if (written !== buffer.length)
+        throw new Error(`short write (${written}/${buffer.length} bytes)`);
       fsyncSync(fd);
       return;
     } finally {
@@ -323,15 +329,20 @@ export function appendDurable(
 }
 
 function noFollowFlag(): number {
+  // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
   if (process.env.WEBMCP_TEST_DISABLE_NOFOLLOW === "1") return 0;
   return (constants as unknown as Record<string, number | undefined>).O_NOFOLLOW ?? 0;
 }
 
-function sameFile(left: { dev: number; ino: number }, right: { dev: number; ino: number }): boolean {
+function sameFile(
+  left: { dev: number; ino: number },
+  right: { dev: number; ino: number },
+): boolean {
   return left.dev === right.dev && left.ino === right.ino;
 }
 
 function pathNamesFile(path: string, opened: { dev: number; ino: number }): boolean {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const current = lstatSync(path);
     return current.isFile() && !current.isSymbolicLink() && sameFile(current, opened);
@@ -343,10 +354,13 @@ function pathNamesFile(path: string, opened: { dev: number; ino: number }): bool
 // Deterministic test seam for swapping a final path after lstat but before open while
 // O_NOFOLLOW is disabled. It is inert outside a deliberately configured subprocess.
 function portablePathTestBarrier(operation: "read" | "append", path: string): void {
+  // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
   const directory = process.env.WEBMCP_TEST_PATH_BARRIER;
   if (
     !directory ||
+    // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
     process.env.WEBMCP_TEST_PATH_OPERATION !== operation ||
+    // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
     process.env.WEBMCP_TEST_PATH_TARGET !== path
   ) {
     return;
@@ -363,6 +377,7 @@ function portablePathTestBarrier(operation: "read" | "append", path: string): vo
   }
   const deadline = Date.now() + 5_000;
   while (true) {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       if (lstatSync(release).isFile()) return;
     } catch {

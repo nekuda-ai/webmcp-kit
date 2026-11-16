@@ -24,7 +24,12 @@
     {
       "id": "implement",
       "path": "skills/implement/SKILL.md",
-      "description": "Add WebMCP tools to a website: read the repo, propose a tool plan, wait for approval, implement against @nekuda/webmcp-sdk, and verify each tool in a real browser."
+      "description": "Add WebMCP tools across a whole website in one run: read the repo, plan the tools for every visitor journey together, wait for approval, implement against @nekuda/webmcp-sdk, and verify each tool in a real browser."
+    },
+    {
+      "id": "build-webmcp-tools",
+      "path": "skills/build-webmcp-tools/SKILL.md",
+      "description": "Google's skill for designing WebMCP tools in depth, one goal at a time: user goals, starting states, turn-by-turn role-play, tool design rules and budgets, annotations, schema.json and evals.json, framework patterns and an audit checklist. Bundled unmodified from GoogleChromeLabs/webmcp-tools (Apache-2.0)."
     },
     {
       "id": "verify",
@@ -34,11 +39,16 @@
     {
       "id": "connect-existing-tools",
       "path": "skills/connect-existing-tools/SKILL.md",
-      "description": "Connect a site's existing WebMCP tools to AgentLane without rebuilding them: detect the current registrations, inventory them, migrate the registration layer to @nekuda/webmcp-sdk with durable stable keys, and verify behavior is unchanged."
+      "description": "Connect a site's existing WebMCP tools to AgentLane without rebuilding them: detect the current registrations, inventory them, migrate the registration layer to @nekuda/webmcp-sdk with durable stable keys, and verify behavior is unchanged; or, when the developer declines that rewrite, a tracking-only install that reports the tools as they are."
     }
   ],
   "install": {
     "claude-code": ["/plugin marketplace add nekuda-ai/webmcp-kit", "/plugin install webmcp-kit@nekuda"],
-    "codex": ["codex plugin marketplace add nekuda-ai/webmcp-kit", "codex plugin add webmcp-kit"]
+    "codex": [
+      "codex plugin marketplace add nekuda-ai/webmcp-kit",
+      "codex plugin add webmcp-kit",
+      "codex features enable mcp_2026_07_28",
+      "codex mcp login agentlane"
+    ]
   }
 }

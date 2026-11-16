@@ -10,8 +10,8 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   renameSync,
   unlinkSync,
@@ -22,18 +22,18 @@ import { join } from "node:path";
 import type { ServerWebSocket } from "bun";
 import {
   AppendLimitError,
-  MAX_JOURNAL_BYTES,
-  MAX_REQUEST_BYTES,
-  MAX_JOURNAL_LINE_BYTES,
-  PROTOCOL_VERSION,
-  SERVICE,
   appendDurable,
+  MAX_JOURNAL_BYTES,
+  MAX_JOURNAL_LINE_BYTES,
+  MAX_REQUEST_BYTES,
+  PROTOCOL_VERSION,
   parseRecordedEnvelope,
   parseRunFile,
-  readRegularText,
-  validateRequest,
   type RecordedEnvelope,
   type RunFileV1,
+  readRegularText,
+  SERVICE,
+  validateRequest,
 } from "./protocol";
 
 const ACTIONABLE = new Set(["comment", "feedback", "submit", "approve", "cancel", "connect"]);
@@ -78,6 +78,7 @@ const feedbackFile = join(stateDir, "_feedback.ndjson");
 const deliveryFile = join(stateDir, "_delivery.ndjson");
 
 function stateDirIsReal(): boolean {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     return lstatSync(stateDir).isDirectory() && !lstatSync(stateDir).isSymbolicLink();
   } catch {
@@ -85,6 +86,7 @@ function stateDirIsReal(): boolean {
   }
 }
 
+// biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
 try {
   if (lstatSync(stateDir).isSymbolicLink()) {
     console.error(`refusing to start: ${stateDir} is a symlink`);
@@ -98,6 +100,7 @@ if (!stateDirIsReal()) {
   console.error(`refusing to start: ${stateDir} is not a real directory`);
   process.exit(1);
 }
+// biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
 try {
   if (lstatSync(runFile).isSymbolicLink()) {
     console.error("refusing to start: .webmcp/.run.json is a symlink");
@@ -110,10 +113,15 @@ try {
 function writeFileExclusive(path: string, text: string): void {
   let fd: number | undefined;
   try {
-    fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o644);
+    fd = openSync(
+      path,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
+      0o644,
+    );
     const buffer = Buffer.from(text, "utf8");
     const written = writeSync(fd, buffer, 0, buffer.length);
-    if (written !== buffer.length) throw new Error(`short write (${written}/${buffer.length} bytes)`);
+    if (written !== buffer.length)
+      throw new Error(`short write (${written}/${buffer.length} bytes)`);
     fsyncSync(fd);
   } finally {
     if (fd !== undefined) closeSync(fd);
@@ -123,6 +131,7 @@ function writeFileExclusive(path: string, text: string): void {
 function readRun(): RunFileV1 | null {
   const text = readRegularText(runFile, MAX_RUNTIME_BYTES);
   if (text === null) return null;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const parsed = parseRunFile(JSON.parse(text));
     return parsed?.workspace === workspace ? parsed : null;
@@ -142,6 +151,7 @@ function scopedUrl(run: RunFileV1, pathname: string): string {
 }
 
 async function isLive(run: RunFileV1): Promise<boolean> {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const response = await fetch(scopedUrl(run, "/healthz"), {
       signal: AbortSignal.timeout(500),
@@ -183,6 +193,7 @@ type LockOwner = { pid: number; nonce: string; lease_expires_at_ms: number };
 function lockOwnerAt(path: string): LockOwner | null {
   const text = readRegularText(path, 4096);
   if (text === null) return null;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const value = JSON.parse(text) as Record<string, unknown>;
     const keys = Object.keys(value).sort().join(",");
@@ -242,6 +253,7 @@ async function acquireLock(): Promise<RunFileV1 | null> {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     } finally {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         unlinkSync(stage);
       } catch {
@@ -283,6 +295,7 @@ async function acquireLock(): Promise<RunFileV1 | null> {
     // On a mismatch, put that fresh owner's inode back only if the canonical name is still
     // free, then abort. Its owner independently revalidates the canonical claim below.
     if (!sameLockOwner(lockOwnerAt(stale), owner)) {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         linkSync(stale, lockFile);
         unlinkSync(stale);
@@ -357,6 +370,7 @@ function maxRecordedOrder(runId: string): number {
   let max = 0;
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       const envelope = parseRecordedEnvelope(JSON.parse(line));
       if (envelope?.run_id === runId && envelope.order > max) max = envelope.order;
@@ -408,9 +422,12 @@ function publishChanges(): void {
   const next = stateFiles();
   const names = [...new Set([...Object.keys(publishedFiles), ...Object.keys(next)])].sort();
   for (const name of names) {
-    const present = Object.prototype.hasOwnProperty.call(next, name);
+    const present = Object.hasOwn(next, name);
     if (present && next[name] === publishedFiles[name]) continue;
-    server.publish("page", JSON.stringify({ type: "file", name, text: present ? next[name] : null }));
+    server.publish(
+      "page",
+      JSON.stringify({ type: "file", name, text: present ? next[name] : null }),
+    );
   }
   publishedFiles = next;
 }
@@ -432,7 +449,9 @@ function sendError(
   message: string,
   requestId?: string,
 ): void {
-  ws.send(JSON.stringify({ type: "error", ...(requestId ? { request_id: requestId } : {}), message }));
+  ws.send(
+    JSON.stringify({ type: "error", ...(requestId ? { request_id: requestId } : {}), message }),
+  );
 }
 
 function journalByteLimit(): number {
@@ -488,7 +507,8 @@ function startServer(port: number) {
         if (!sameOrigin(req, srv.port)) return new Response("forbidden origin", { status: 403 });
         if (!authorized(url)) return new Response("forbidden", { status: 403 });
         const role = url.searchParams.get("role");
-        if (role !== "page" && role !== "claude") return new Response("unknown role", { status: 400 });
+        if (role !== "page" && role !== "claude")
+          return new Response("unknown role", { status: 400 });
         if (srv.upgrade(req, { data: { role } })) return;
         return new Response("upgrade failed", { status: 400 });
       }
@@ -610,6 +630,7 @@ function writeAtomic(path: string, text: string): void {
     writeFileExclusive(temporary, text);
     renameSync(temporary, path);
   } finally {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       unlinkSync(temporary);
     } catch {
@@ -631,6 +652,7 @@ function ensureRuntimeIgnored(): void {
 }
 
 function publishPort(path: string, port: number): void {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     if (lstatSync(path).isSymbolicLink() || !lstatSync(path).isFile()) {
       console.log(`warning: ${path} is not a regular file; leaving it untouched`);
@@ -668,6 +690,7 @@ function runtimeIsOurs(): boolean {
 
 function releaseLock(): void {
   if (!ownLock || readRegularText(lockFile, 4096) !== ownLockText) return;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     unlinkSync(lockFile);
   } catch {
@@ -686,10 +709,12 @@ function renewServerLock(): boolean {
   const stage = `${lockFile}.renew.${process.pid}.${crypto.randomUUID()}`;
   const tombstone = `${lockFile}.renewing.${crypto.randomUUID()}`;
   let quarantinedOurs = false;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     writeFileExclusive(stage, renewedText);
     renameSync(lockFile, tombstone);
     if (readRegularText(tombstone, 4096) !== ownLockText) {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         linkSync(tombstone, lockFile);
         unlinkSync(tombstone);
@@ -699,6 +724,7 @@ function renewServerLock(): boolean {
       return false;
     }
     quarantinedOurs = true;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       linkSync(stage, lockFile);
     } catch {
@@ -709,10 +735,12 @@ function renewServerLock(): boolean {
   } catch {
     return false;
   } finally {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       unlinkSync(stage);
     } catch {}
     if (quarantinedOurs) {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         unlinkSync(tombstone);
       } catch {}
@@ -722,11 +750,13 @@ function renewServerLock(): boolean {
 
 function clearLiveness(): void {
   if (runtimeIsOurs()) {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       unlinkSync(runFile);
     } catch {}
   }
   if (portNumberIn(portFile) === liveRun.port) {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       unlinkSync(portFile);
     } catch {}
@@ -753,7 +783,9 @@ watcher = watch(stateDir, () => {
   clearTimeout(debounce);
   debounce = setTimeout(publishChanges, 120);
 });
-watcher.on("error", (error) => console.log(`warning: state folder watch stopped (${error.message})`));
+watcher.on("error", (error) =>
+  console.log(`warning: state folder watch stopped (${error.message})`),
+);
 
 // Some platforms coalesce or omit rename events. Re-read by content every 250 ms so an
 // atomic replace still reaches the page exactly once.

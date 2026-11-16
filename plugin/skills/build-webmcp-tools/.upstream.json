@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/GoogleChromeLabs/webmcp-tools",
+  "path": "webmcp-skills/skills/build-webmcp-tools",
+  "commit": "fe69ca43dc84966995f803431e35d8fa2748081c",
+  "license": "Apache-2.0",
+  "digest": "sha256:25e6ac0675c0b8ca3c3d4ef80d9af9ca2784cee7a0cc526849678d88118ec33c"
+}

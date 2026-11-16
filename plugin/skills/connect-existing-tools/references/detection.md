@@ -15,6 +15,9 @@ without writing anything to the tree.
 4. **Source unavailable** — observed in the running site but no defining source could be located.
    Reported honestly; migration is source-level, so there is nothing to safely rewrite.
 
+Cases 3 and 4 are never rewritten, but a tracking-only install reports them as they are
+(`tracking-only.md`), as it does any case-2 tool whose rewrite the developer declines.
+
 Precedence when a tool matches more than one: **1 beats 2 beats 3**, because the case describes the
 registration path the tool actually travels, and a wrapper is what registers it. A tool defined
 with a third-party helper but registered through `registerTools` is case 1 — connecting it needs no
@@ -36,8 +39,13 @@ not on a name copied from this file.
 
 ```
 @nekuda/webmcp-sdk|@agentlane/webmcp|@nekuda/webmcp
-\bdefineTool\b|\bregisterTools\b
+\bdefineTool\b|\bregisterTools\b|\btrackTools\b
 ```
+
+A `trackTools` call is not a finding: it is an existing **tracking-only install**. Record its
+module as the entry module of that registration scope, and its tracking options as they stand.
+The tools it reports keep their own case (2, 3 or 4); the install decides the path
+(`SKILL.md` → *Tracking-only fast path*).
 
 Each `defineTool` call is a finding. Record its existing `stableKey` verbatim — it is immutable
 (`stable-keys.md`) and a re-run adopts it rather than deriving a new one.

@@ -8,8 +8,8 @@ browser driver through this kit's `webmcp browser` entry (`verify.md`); `nkd` re
 ## Install
 
 `nkd --version` prints `nkd <version> (API <date>)` when it is installed. When it is not, ask the
-developer before you install anything globally, then run `npm i -g @nekuda/cli@0.1.0`. For one call
-without an install, use `npx @nekuda/cli@0.1.0 <command>`. The npm package is `@nekuda/cli` and the
+developer before you install anything globally, then run `npm i -g @nekuda/cli@0.2.0`. For one call
+without an install, use `npx @nekuda/cli@0.2.0 <command>`. The npm package is `@nekuda/cli` and the
 command is `nkd`. Do not run `npx nkd`: that is a different package. It needs Node.js 22.12 or
 later.
 

@@ -29,7 +29,9 @@ const START_FLAGS = [
 ] as const;
 
 // An attached browser was launched by someone else: only the driver's own settings apply.
-const ATTACH_FLAGS = START_FLAGS.filter((flag) => !/^--(?:headless|isolated|chrome-arg)=/.test(flag));
+const ATTACH_FLAGS = START_FLAGS.filter(
+  (flag) => !/^--(?:headless|isolated|chrome-arg)=/.test(flag),
+);
 
 // Children, npm-fetched packages included, get what they need to run and reach the network,
 // never the ambient env and its tokens. npm still reads ~/.npmrc itself.
@@ -40,7 +42,9 @@ export function childEnv(
   source: Record<string, string | undefined> = process.env,
   extra?: Record<string, string>,
 ): Record<string, string> {
-  const kept = Object.entries(source).filter(([name, value]) => value !== undefined && FORWARDED_ENV.test(name));
+  const kept = Object.entries(source).filter(
+    ([name, value]) => value !== undefined && FORWARDED_ENV.test(name),
+  );
   return { ...(Object.fromEntries(kept) as Record<string, string>), ...extra };
 }
 
@@ -63,7 +67,11 @@ async function run(
     ]);
     return { code, stdout, stderr };
   } catch (error) {
-    return { code: 126, stdout: "", stderr: error instanceof Error ? error.message : String(error) };
+    return {
+      code: 126,
+      stdout: "",
+      stderr: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -105,8 +113,7 @@ function browserSupported(version: string): boolean {
 export function browserVersionProbe(
   path: string,
   platform = process.platform,
-  powershell =
-    Bun.which("powershell.exe") ??
+  powershell = Bun.which("powershell.exe") ??
     Bun.which("pwsh.exe") ??
     Bun.which("powershell") ??
     Bun.which("pwsh"),
@@ -197,7 +204,8 @@ function cachedBrowserPaths(root: string, depth = 0): string[] {
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const path = join(root, entry.name);
     if (entry.isDirectory()) paths.push(...cachedBrowserPaths(path, depth + 1));
-    else if (["chrome", "chrome.exe", "Google Chrome for Testing"].includes(entry.name)) paths.push(path);
+    else if (["chrome", "chrome.exe", "Google Chrome for Testing"].includes(entry.name))
+      paths.push(path);
   }
   return paths;
 }
@@ -251,7 +259,10 @@ async function installBrowser(npm: string, nodeVersion: string): Promise<string 
     "--format={{path}}",
   ]);
   if (result.code !== 0) {
-    await fail("Chrome for Testing download failed. Check network access and retry.", result.stderr || result.stdout);
+    await fail(
+      "Chrome for Testing download failed. Check network access and retry.",
+      result.stderr || result.stdout,
+    );
     return undefined;
   }
   return result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
@@ -266,6 +277,7 @@ export function listed({ code, stdout }: Output): boolean {
 }
 
 function pages(text: string): boolean {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     return "pages" in Object(JSON.parse(text));
   } catch {
@@ -283,7 +295,9 @@ export async function browserMain(args: string[]): Promise<number> {
   if (attachUrl) {
     // The driver finds the browser's socket at `<url>/json/version`.
     if (!/^https?:\/\/./i.test(attachUrl) || !URL.canParse(attachUrl)) {
-      return fail(`WEBMCP_BROWSER_URL must be an http(s) DevTools endpoint, such as http://127.0.0.1:9222.`);
+      return fail(
+        "WEBMCP_BROWSER_URL must be an http(s) DevTools endpoint, such as http://127.0.0.1:9222.",
+      );
     }
     // It reaches the driver as --browserUrl, and argv is readable by any local user.
     const { username, password } = new URL(attachUrl);
@@ -292,7 +306,10 @@ export async function browserMain(args: string[]): Promise<number> {
         "WEBMCP_BROWSER_URL must not carry credentials: the driver's argv would show them to every local user. Expose the endpoint without them, e.g. an SSH tunnel to 127.0.0.1.",
       );
     }
-    if (executablePath(args.slice(1))) return fail("Nothing to launch when attaching: unset WEBMCP_BROWSER_URL or drop --executable-path.");
+    if (executablePath(args.slice(1)))
+      return fail(
+        "Nothing to launch when attaching: unset WEBMCP_BROWSER_URL or drop --executable-path.",
+      );
   }
   const node = Bun.which("node");
   if (!node) return fail("Node.js is required. Install a supported Node.js release, then retry.");
@@ -315,11 +332,17 @@ export async function browserMain(args: string[]): Promise<number> {
     if (attachUrl) {
       browser = [`--browserUrl=${attachUrl}`, ...ATTACH_FLAGS];
     } else {
-      const path = executablePath(args.slice(1)) ?? (await discoverBrowser()) ?? (await installBrowser(npm, nodeVersion.stdout));
+      const path =
+        executablePath(args.slice(1)) ??
+        (await discoverBrowser()) ??
+        (await installBrowser(npm, nodeVersion.stdout));
       if (!path) return 1;
       const version = await probeBrowser(path);
       if (version.code !== 0 || !browserSupported(version.stdout)) {
-        return fail(`Chrome 150+ is required; ${path} is not a supported executable.`, version.stderr);
+        return fail(
+          `Chrome 150+ is required; ${path} is not a supported executable.`,
+          version.stderr,
+        );
       }
       browser = [...START_FLAGS, `--executable-path=${path}`];
     }
@@ -341,10 +364,18 @@ export async function browserMain(args: string[]): Promise<number> {
     if (result.code !== 0 || !attachUrl) return result.code;
     // The daemon connects lazily: connect now, the way every later command will, so a dead
     // endpoint fails `start` with its cause.
-    const pages = await run(npm, [...PACKAGE_ARGS, "list_pages", "--output-format=json", `--sessionId=${sessionId}`]);
+    const pages = await run(npm, [
+      ...PACKAGE_ARGS,
+      "list_pages",
+      "--output-format=json",
+      `--sessionId=${sessionId}`,
+    ]);
     if (listed(pages)) return 0;
     await run(npm, [...PACKAGE_ARGS, "stop", `--sessionId=${sessionId}`]);
-    return fail(`no browser to attach to at WEBMCP_BROWSER_URL=${attachUrl}.`, pages.stderr || pages.stdout);
+    return fail(
+      `no browser to attach to at WEBMCP_BROWSER_URL=${attachUrl}.`,
+      pages.stderr || pages.stdout,
+    );
   }
 
   const result = await run(npm, [...PACKAGE_ARGS, ...args, `--sessionId=${sessionId}`]);

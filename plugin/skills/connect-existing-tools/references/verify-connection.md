@@ -88,7 +88,7 @@ Observe the keyed request first; only then does silence mean the key was accepte
    `tracking.apiKey` (and the endpoint `connect.md` step 4 chose), and `mcp:publishable_keys_list`
    shows that key `enabled` and not revoked. This proves the seam is wired; it proves nothing about
    the browser.
-2. **Readiness** — the key answer's `edge_ready: true` from `mcp:publishable_keys_create`. This proves the far side
+2. **Readiness** — `edge_ready: true` in the `mcp:projects_connect` answer. This proves the far side
    accepted the site's registration; it proves nothing about the page the visitor loads.
 3. **Runtime** — load a declared page **of this registration scope**, invoke one real tool, and
    observe both:
@@ -154,6 +154,30 @@ what was proven:
 - **migrated, not attributed** — behavior diff clean, connection not proven (skipped, declined, or
   no browser). The migration stands on its own; re-running the connection is how it finishes.
 
-Print the per-tool table, then restate every non-**connected** row and its reason in the summary and
-in the PR body. A failed row blocks the PR. The flagged ones do not — they are the honest edge of
+A tracking-only install (`tracking-only.md`) reports its tools in their own states, never as
+**connected**, because no registration moved onto the SDK:
+
+Each tool takes exactly one of these, the first that applies:
+
+- **failed** — the install changed a tool's behavior or its debug check failed. The whole
+  install rolls back (`tracking-only.md` → *Rollback*).
+- **not reported: excluded by the developer** — left out by `exclude`, or by an `include` that
+  does not name it (`tracking-only.md` section 3). It registers as before; no report is expected.
+- **tracked, calls not reported** — registered before the setup call by code the install cannot
+  precede (`tracking-only.md` → *Listed, calls not reported*): listed, its calls missed. Ships
+  flagged, with the script that registers it.
+- **tracked, unverified** — the debug check neither passed nor failed: `debug_refused`, nothing
+  printed with reporting off, no console canary, a `tools` list cut down to a count, a head tag the framework would not serve
+  plain (`tracking-only.md` section 2), or a fast
+  path that ran no debug check (its lists and placement unchanged). Ships flagged, with which of
+  these it was.
+- **tracked, not attributed** — debug check passed, and Connect declined, failed (its writes
+  undone, the install kept), or healthy with no attributed arrival seen (no safe call, or no
+  browser).
+- **tracked** — debug check passed, Connect healthy, attributed arrival seen.
+
+A skipped install leaves no tracking-only rows: it rolled back whole.
+
+Print the per-tool table, then restate every row other than **connected** or **tracked** and its
+reason in the summary and in the PR body, **not reported: excluded by the developer** included. A failed row blocks the PR. The flagged ones do not — they are the honest edge of
 what this run could prove.

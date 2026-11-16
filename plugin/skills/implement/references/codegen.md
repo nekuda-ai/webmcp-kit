@@ -7,7 +7,7 @@ same code ships to every browser.
 ## Install
 
 - **Add the npm package** `@nekuda/webmcp-sdk` with the repo's own package manager (the one its
-  lockfile belongs to), so the lockfile records it. It is a browser ES module with types and no
+  lockfile belongs to), so the lockfile records it; a repo with no lockfile gets npm. It is a browser ES module with types and no
   runtime dependencies. Start the install as a background task the moment generation is approved
   and write tool modules while it runs: only the first typecheck waits for it.
 - **Already a dependency:** keep the repo's version when its `dist/index.d.ts` has every field the
@@ -358,7 +358,7 @@ addEventListener("pagehide", () => reg.unregister(), { once: true });
 
 **No bundler** — the entry module is the browser-served file itself (for example
 `public/webmcp/entry.js`), importing the copied SDK and the tool modules by relative URL. After a
-cold server restart, load a declared page and require every module request in that graph to return
+cold server restart (`references/verify.md` → *Servers you start*), load a declared page and require every module request in that graph to return
 2xx before claiming registration.
 
 Match the repo: TypeScript → `.ts`/`.tsx`; JavaScript → `.js`/`.jsx` without type annotations.

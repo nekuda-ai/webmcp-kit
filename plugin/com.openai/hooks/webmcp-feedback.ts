@@ -7,6 +7,7 @@
  * fail-open: malformed or unsafe local state never interrupts unrelated work.
  */
 import { createHash, randomUUID } from "node:crypto";
+import type { Stats } from "node:fs";
 import {
   closeSync,
   constants,
@@ -23,7 +24,6 @@ import {
   writeFileSync,
   writeSync,
 } from "node:fs";
-import type { Stats } from "node:fs";
 import { dirname, isAbsolute, join, parse } from "node:path";
 
 const VERSION = 1;
@@ -144,6 +144,7 @@ function nowIso(): string {
 }
 
 function wallClockMs(): number {
+  // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
   const testValue = process.env.WEBMCP_HOOK_TEST_NOW_MS;
   if (testValue !== undefined) {
     const value = Number(testValue);
@@ -153,6 +154,7 @@ function wallClockMs(): number {
 }
 
 function envMs(name: string, fallback: number, minimum: number, maximum: number): number {
+  // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
   const value = Number.parseInt(process.env[name] ?? "", 10);
   if (!Number.isFinite(value)) return fallback;
   return Math.min(Math.max(value, minimum), maximum);
@@ -184,11 +186,13 @@ function validIdentifier(value: unknown): value is string {
   return (
     boundedString(value, MAX_IDENTIFIER_BYTES) &&
     value === value.trim() &&
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: an identifier refuses them
     !/[\u0000-\u001f\u007f]/.test(value)
   );
 }
 
 function validSessionId(value: unknown): value is string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: a session id refuses them
   return boundedString(value, 256) && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
@@ -199,6 +203,7 @@ function validIso(value: unknown): value is string {
 }
 
 function isRealDirectory(path: string): boolean {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const info = lstatSync(path);
     return info.isDirectory() && !info.isSymbolicLink();
@@ -208,6 +213,7 @@ function isRealDirectory(path: string): boolean {
 }
 
 function pathExists(path: string): boolean {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     lstatSync(path);
     return true;
@@ -238,11 +244,7 @@ function readRegular(path: string, maxBytes: number): Buffer | null {
     }
     fd = openSync(path, constants.O_RDONLY | NOFOLLOW);
     const opened = fstatSync(fd);
-    if (
-      !opened.isFile() ||
-      opened.size > maxBytes ||
-      !sameFileIdentity(before, opened)
-    ) {
+    if (!opened.isFile() || opened.size > maxBytes || !sameFileIdentity(before, opened)) {
       throw new UnsafeState(`unsafe opened file ${path}`);
     }
     const data = readFileSync(fd);
@@ -265,8 +267,10 @@ async function readHookInput(): Promise<HookInput | null> {
   // Bound the whole input, not each chunk; cancellation closes the pending read.
   const timer = setTimeout(() => {
     timedOut = true;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     void reader.cancel().catch(() => {});
   }, INPUT_TIMEOUT_MS);
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -287,6 +291,7 @@ async function readHookInput(): Promise<HookInput | null> {
   if (timedOut) return null;
   const data = Buffer.concat(chunks, total);
   let value: unknown;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     value = JSON.parse(data.toString("utf8"));
   } catch {
@@ -359,6 +364,7 @@ function runtimeAt(workspace: string): Runtime | null {
   const runPath = join(stateDir, ".run.json");
   if (!isRealDirectory(stateDir)) return null;
   let value: unknown;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const data = readRegular(runPath, MAX_RUN_BYTES);
     if (data === null) return null;
@@ -396,6 +402,7 @@ function runtimeAt(workspace: string): Runtime | null {
     return null;
   }
   let canonical: string;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     canonical = realpathSync(workspace);
     if (value.workspace !== canonical || realpathSync(value.workspace) !== canonical) return null;
@@ -416,6 +423,7 @@ function runtimeAt(workspace: string): Runtime | null {
 
 function discoverRuntime(cwd: string): Runtime | null {
   let current: string;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     current = realpathSync(cwd);
   } catch {
@@ -467,7 +475,10 @@ async function responseBodyLimited(response: Response, maxBytes: number): Promis
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total);
+  return Buffer.concat(
+    chunks.map((chunk) => Buffer.from(chunk)),
+    total,
+  );
 }
 
 async function liveRuntime(runtime: Runtime): Promise<boolean> {
@@ -475,12 +486,8 @@ async function liveRuntime(runtime: Runtime): Promise<boolean> {
     capability: runtime.capability,
     run_id: runtime.runId,
   });
-  const timeout = envMs(
-    "WEBMCP_HOOK_HEALTH_TIMEOUT_MS",
-    DEFAULT_HEALTH_TIMEOUT_MS,
-    25,
-    5_000,
-  );
+  const timeout = envMs("WEBMCP_HOOK_HEALTH_TIMEOUT_MS", DEFAULT_HEALTH_TIMEOUT_MS, 25, 5_000);
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const response = await fetch(`http://127.0.0.1:${runtime.port}/healthz?${query}`, {
       headers: { accept: "application/json" },
@@ -538,6 +545,7 @@ function ndjson(path: string): Array<[number, unknown]> {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]!;
     if (line.trim().length === 0 || byteLength(line) > MAX_LINE_BYTES) continue;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       values.push([index + 1, JSON.parse(line)]);
     } catch {
@@ -556,7 +564,9 @@ function feedbackEvents(runtime: Runtime): Event[] {
     seen.add(event.eventId);
     events.push(event);
   }
-  return events.sort((left, right) => left.order - right.order || left.lineNumber - right.lineNumber);
+  return events.sort(
+    (left, right) => left.order - right.order || left.lineNumber - right.lineNumber,
+  );
 }
 
 function handledEventIds(runtime: Runtime): Set<string> {
@@ -579,6 +589,7 @@ function handledEventIds(runtime: Runtime): Set<string> {
 
 function safeAppend(path: string, value: JsonObject): boolean {
   let fd: number | undefined;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     let before: Stats | null = null;
     if (pathExists(path)) {
@@ -600,8 +611,8 @@ function safeAppend(path: string, value: JsonObject): boolean {
       !after.isFile() ||
       after.isSymbolicLink() ||
       opened.size + data.byteLength > MAX_JOURNAL_BYTES ||
-      (!sameFileIdentity(after, opened) ||
-        (before !== null && !sameFileIdentity(before, opened)))
+      !sameFileIdentity(after, opened) ||
+      (before !== null && !sameFileIdentity(before, opened))
     ) {
       return false;
     }
@@ -636,6 +647,7 @@ function atomicReplaceRegular(path: string, data: string, maxBytes: number): voi
     }
     renameSync(tempPath, path);
   } finally {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       rmSync(tempPath, { force: true });
     } catch {}
@@ -643,6 +655,7 @@ function atomicReplaceRegular(path: string, data: string, maxBytes: number): voi
 }
 
 function pluginStateBase(): string {
+  // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
   const pluginData = process.env.PLUGIN_DATA;
   if (!pluginData || !isAbsolute(pluginData)) {
     throw new UnsafeState("PLUGIN_DATA must be an absolute path");
@@ -652,6 +665,7 @@ function pluginStateBase(): string {
   // versioned state dir below. A symlink or non-directory still fails closed:
   // mkdir errors are ignored only because isRealDirectory re-checks the result.
   if (!isRealDirectory(pluginData)) {
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       mkdirSync(pluginData, { recursive: true, mode: 0o700 });
     } catch {}
@@ -746,6 +760,7 @@ class PortableLock {
     try {
       mkdirSync(candidatePath, { mode: 0o700 });
       candidateIdentity = lstatSync(candidatePath);
+      // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
       if (process.env.WEBMCP_HOOK_TEST_CRASH_AFTER_LOCK_CANDIDATE === "1") process.exit(87);
       const owner: LockOwner = {
         version: VERSION,
@@ -765,6 +780,7 @@ class PortableLock {
       this.held = true;
       return true;
     } catch (error) {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         if (candidateIdentity !== null && isRealDirectory(candidatePath)) {
           const currentIdentity = lstatSync(candidatePath);
@@ -783,6 +799,7 @@ class PortableLock {
 
   private readOwner(): LockOwner | null {
     if (!isRealDirectory(this.path)) return null;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       const data = readRegular(join(this.path, "owner.json"), MAX_STATE_BYTES);
       return data === null ? null : parseLockOwner(JSON.parse(data.toString("utf8")));
@@ -841,6 +858,7 @@ class PortableLock {
     }
     try {
       const quarantined = (() => {
+        // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
         try {
           const data = readRegular(join(tombstone, "owner.json"), MAX_STATE_BYTES);
           return data === null ? null : parseLockOwner(JSON.parse(data.toString("utf8")));
@@ -858,6 +876,7 @@ class PortableLock {
           Date.now() - quarantined.created_at_ms >= maxAge);
       if (!quarantineIsObservedOwner && !quarantineIsRecoverableOrphan) {
         // Preserve an object we cannot prove is the crashed lock we observed.
+        // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
         try {
           renameSync(tombstone, this.path);
         } catch {}
@@ -873,6 +892,7 @@ class PortableLock {
 
   release(): void {
     if (!this.held) return;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       const owner = this.readOwner();
       if (owner?.token === this.token) rmSync(this.path, { recursive: true, force: true });
@@ -1063,6 +1083,7 @@ async function recordLaunchIntent(
 ): Promise<void> {
   let store: LaunchIntentStore | undefined;
   let establishedStore: RunStore | undefined;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     if (resume) {
       if (priorRuntime === null) return;
@@ -1100,12 +1121,7 @@ async function recordLaunchIntent(
       return;
     }
     if (existing !== null) store.remove();
-    const ttl = envMs(
-      "WEBMCP_HOOK_LAUNCH_INTENT_MS",
-      DEFAULT_LAUNCH_INTENT_MS,
-      1_000,
-      5 * 60_000,
-    );
+    const ttl = envMs("WEBMCP_HOOK_LAUNCH_INTENT_MS", DEFAULT_LAUNCH_INTENT_MS, 1_000, 5 * 60_000);
     store.save({
       version: VERSION,
       session_id: hookInput.sessionId,
@@ -1126,14 +1142,14 @@ async function recordLaunchIntent(
 
 async function consumeMatchingLaunchIntent(runtime: Runtime, sessionId: string): Promise<void> {
   let store: LaunchIntentStore | undefined;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     store = new LaunchIntentStore(runtime.workspace);
     if (!pathExists(store.statePath)) return;
     if (!(await acquireWithRetry(store.lock))) return;
     const intent = store.load();
     const exactResume =
-      intent?.resume_run_id === runtime.runId &&
-      intent.resume_capability === runtime.capability;
+      intent?.resume_run_id === runtime.runId && intent.resume_capability === runtime.capability;
     const producedNormal =
       intent?.resume_run_id === null && launchIntentProducedRuntime(intent, runtime);
     if (intent?.session_id === sessionId && (exactResume || producedNormal)) {
@@ -1155,6 +1171,7 @@ function launchIntentProducedRuntime(intent: LaunchIntent, runtime: Runtime): bo
 
 async function pruneMismatchedResumeIntent(runtime: Runtime): Promise<void> {
   let store: LaunchIntentStore | undefined;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     store = new LaunchIntentStore(runtime.workspace);
     if (!pathExists(store.statePath) || !(await acquireWithRetry(store.lock))) return;
@@ -1162,8 +1179,7 @@ async function pruneMismatchedResumeIntent(runtime: Runtime): Promise<void> {
     if (
       intent !== null &&
       intent.resume_run_id !== null &&
-      (intent.resume_run_id !== runtime.runId ||
-        intent.resume_capability !== runtime.capability)
+      (intent.resume_run_id !== runtime.runId || intent.resume_capability !== runtime.capability)
     ) {
       store.remove();
     }
@@ -1278,6 +1294,7 @@ async function claimNext(runtime: Runtime, hookInput: HookInput): Promise<ClaimR
       store.save(state);
       return { kind: "error", lastOrder };
     }
+    // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
     if (process.env.WEBMCP_HOOK_TEST_CRASH_AFTER_CLAIM === "1") process.exit(86);
     return { kind: "claimed", event: oldestUnacked, lastOrder };
   } catch (error) {
@@ -1300,8 +1317,11 @@ function commandQuote(value: string): string {
 }
 
 function installedPluginPaths(): PluginPaths | null {
+  // biome-ignore lint/plugin/env-outside-config: known violation, older than this rule
   const configuredRoot = process.env.PLUGIN_ROOT;
-  if (!configuredRoot || !isAbsolute(configuredRoot) || !isRealDirectory(configuredRoot)) return null;
+  if (!configuredRoot || !isAbsolute(configuredRoot) || !isRealDirectory(configuredRoot))
+    return null;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const canonicalRoot = realpathSync(configuredRoot);
     const ackPath = join(canonicalRoot, "skills", "implement", "interactive", "ack-event.ts");
@@ -1378,7 +1398,10 @@ function firstShellCommandWords(command: string): string[] | null {
   return words;
 }
 
-function canonicalLaunchWorkspace(hookInput: HookInput, serverPath: string): CanonicalLaunch | null {
+function canonicalLaunchWorkspace(
+  hookInput: HookInput,
+  serverPath: string,
+): CanonicalLaunch | null {
   if (
     hookInput.eventName !== "PreToolUse" ||
     hookInput.toolName !== "Bash" ||
@@ -1395,12 +1418,11 @@ function canonicalLaunchWorkspace(hookInput: HookInput, serverPath: string): Can
   ) {
     return null;
   }
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     if (!isAbsolute(words[2]!)) return null;
     const workspace = realpathSync(words[2]!);
-    return isRealDirectory(workspace)
-      ? { workspace, resume: words.length === 4 }
-      : null;
+    return isRealDirectory(workspace) ? { workspace, resume: words.length === 4 } : null;
   } catch {
     return null;
   }
@@ -1411,11 +1433,7 @@ function eventContext(runtime: Runtime, event: Event, ackPath: string): string {
   const ackCommand =
     `bun ${commandQuote(ackPath)} ` +
     `${commandQuote(runtime.workspace)} ${commandQuote(runtime.runId)} ${commandQuote(event.eventId)}`;
-  return (
-    "A WebMCP Explorer action is pending. Handle this immutable event before continuing: " +
-    `${compact}. After durably handling it, acknowledge only by running: ${ackCommand}. ` +
-    "Never hand-write the acknowledgement journal, and do not acknowledge an intention or failed effect."
-  );
+  return `A WebMCP Explorer action is pending. Handle this immutable event before continuing: ${compact}. After durably handling it, acknowledge only by running: ${ackCommand}. Never hand-write the acknowledgement journal, and do not acknowledge an intention or failed effect.`;
 }
 
 function emitPreTool(runtime: Runtime, event: Event, ackPath: string): void {
@@ -1469,10 +1487,12 @@ async function main(): Promise<void> {
   // the initial Stop wait it does not create a new user-facing waiting window.
   if (mode === "pre-tool-use" || claim.kind !== "empty") return;
   if (!activeStop) {
-    if (!appendDelivery(runtime, hookInput, "waiting", undefined, {
-      queueDepth: 0,
-      lastOrder: claim.lastOrder,
-    })) {
+    if (
+      !appendDelivery(runtime, hookInput, "waiting", undefined, {
+        queueDepth: 0,
+        lastOrder: claim.lastOrder,
+      })
+    ) {
       return;
     }
   }
@@ -1502,6 +1522,7 @@ async function main(): Promise<void> {
   }
 }
 
+// biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
 try {
   await main();
 } catch {

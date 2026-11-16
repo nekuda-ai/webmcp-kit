@@ -53,7 +53,7 @@ Run the remaining ladder commands through `& $webmcp browser ...` and always end
 
 When the machine's setup notes name a dedicated test browser that already runs, is WebMCP-capable and exposes the Chrome DevTools Protocol (a remote, CI or headless machine, often with no Chrome to launch), set `WEBMCP_BROWSER_URL` to its endpoint, for example `http://127.0.0.1:9222`. `start` then attaches to it instead of launching Chrome, and every other command is the same. Point it only at that dedicated test browser, never the developer's own browser or profile: state-changing calls run in whatever session it holds.
 
-If `start` fails, report its exact Node/npm, download, architecture, shared-library, or launch error and mark browser-dependent tools **could-not-verify**. Never use `sudo`, a system package manager, or a normal Chrome profile. After an interrupted run, use `status`, then `stop`, before retrying. Always stop the driver in cleanup, including after a failed rung.
+If `start` fails, report its exact Node/npm, download, architecture, shared-library, or launch error and mark browser-dependent tools **could-not-verify**. Never use `sudo`, a system package manager, or a normal Chrome profile. After an interrupted run, use `status`, then `stop`, before retrying. Always stop the driver and every server you started in cleanup, including after a failed rung (the `implement` skill's `verify.md` → *Servers you start*).
 
 ### Without the plugin
 

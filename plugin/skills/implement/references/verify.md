@@ -13,6 +13,30 @@ contributing guide, package scripts, Makefile, compose files. Take machine facts
 are already running, a browser this machine provides) from the machine's own setup notes or the
 developer.
 
+## Servers you start
+
+Before starting a server, check its port; if something already listens there, it is the
+developer's — choose another port and leave theirs alone.
+
+1. **Start** each dev server, production server and service as its own process-group leader:
+   `setsid <start command> > <log> 2>&1 &` (where there is no `setsid`, as on macOS, run `set -m`
+   first, then `<start command> > <log> 2>&1 &`). Prefer the framework's binary
+   (`node_modules/.bin/next dev -p <port>`) over an npm script wrapper. Record its process-group
+   id (`$!`, which `ps -o pgid= -p $!` prints back) and port the moment it starts. Never wrap the
+   start in `( … &)` or `nohup … &`: the group id is lost.
+2. **Stop** it with `kill -TERM -- -<pgid>`. Wait up to about 10 s for the recorded port to close
+   (`lsof -nP -iTCP:<port> -sTCP:LISTEN` prints nothing); if it is still open, send
+   `kill -KILL -- -<pgid>`. Confirm the port no longer listens before you build or start the next
+   one.
+
+Never stop a process by name or pattern (`pkill -f`, `killall`, `pgrep -f … | xargs kill`, `fuser -k`):
+other projects on this machine run servers with the same names. A recorded process that is already
+gone, or a port held by a process you did not start, is reported to the developer, never killed.
+
+When the build and the dev server share an output directory (Next.js `.next`), stop the dev server
+as above, run the build, then start the production server the same way and record its new group id.
+Stop every server you started in cleanup, including after a failed rung.
+
 ## Baseline, before your first write
 
 Record whether the repo already typechecks, lints, builds and boots cleanly. Capturing it writes
@@ -30,9 +54,9 @@ could-not-verify.
    unresolved SDK import before then is the install in flight), check the files just written as you
    go, and run the full set once after the last write. A new failure from your change → **failed**;
    fix formatting with the repo's own formatter.
-2. **Boot** — start the app and its services as a background task when generation starts, so this
-   rung checks a server that is already up. Load the declared pages; no console error that the
-   baseline did not have. Cannot boot while the baseline booted → **failed**; the baseline could not
+2. **Boot** — start the app and its services as a background task (*Servers you start*, above)
+   when generation starts, so this rung checks a server that is already up. Load the declared
+   pages; no console error that the baseline did not have. Cannot boot while the baseline booted → **failed**; the baseline could not
    boot → **could-not-verify**.
 3. **Registration** — on each declared page and auth state (anonymous **and** every signed-in role
    the plan names), list the registered tools once and settle every expectation for that page in

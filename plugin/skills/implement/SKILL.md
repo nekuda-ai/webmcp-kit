@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Add WebMCP tools to a website codebase so browser agents can act through the site's own logic instead of scraping the page. Use when asked to make a site agent-ready or WebMCP-ready, add WebMCP or document.modelContext tools, or implement site tools with @nekuda/webmcp-sdk.
+description: Add WebMCP tools to a website codebase so browser agents can act through the site's own logic instead of scraping the page. Covers the whole site in one run — every visitor journey planned together, one approval, code on @nekuda/webmcp-sdk, each tool proven in a browser. Use when asked to make a site agent-ready or WebMCP-ready, add WebMCP or document.modelContext tools to this codebase (the whole site, one flow or one tool), or implement site tools with @nekuda/webmcp-sdk. To design one tool in depth (role-play, schema.json, evals.json) or audit existing tools, use build-webmcp-tools.
 argument-hint: "[request] [--non-interactive | --no-interactive-loop]"
 ---
 
@@ -9,6 +9,21 @@ argument-hint: "[request] [--non-interactive | --no-interactive-loop]"
 WebMCP lets a page hand a browser agent typed tools: the agent lists the page's tools and calls
 them instead of reading the screen and clicking, and each call runs in the visitor's tab through the
 site's own code. You add those tools to this repo with `@nekuda/webmcp-sdk`.
+
+## This skill or `build-webmcp-tools`
+
+The plugin also ships Google's `build-webmcp-tools` skill. The two work at different depths:
+
+- **This skill: breadth.** The whole site in one run: read the repo, plan the tools for every
+  visitor journey together, get one approval, generate them with the SDK, prove each one in a
+  browser, then offer Connect. A request to add tools for one flow, or even one tool, to this
+  codebase runs here too, so its code goes through the SDK.
+- **`build-webmcp-tools`: depth.** One goal at a time: starting states, turn-by-turn role-play,
+  variations, then `schema.json` and `evals.json`. It also audits the design of existing tools and
+  works through Lighthouse "Agentic browsing" findings.
+
+When the developer brings a design made with `build-webmcp-tools` (role-plays, a `schema.json`),
+use it as input to the plan in step 3. The code is still written here, with the SDK.
 
 ## What good looks like
 
@@ -84,7 +99,8 @@ developer wiring* reason.
 
 ### 3. Plan
 
-Load `references/tool-roles.md`, `references/wiring.md` and `references/plan-template.md` together.
+Load `references/tool-roles.md`, `references/wiring.md`, `references/plan-template.md` and
+`references/tool-patterns.md` together.
 Give each tool its role, name, description, inputs, answer, page effect, annotations, where it lives,
 and its wiring: the highest safe rung, as a concrete path in this repo. Resolve the entry-module
 path of each registration scope and the module path of each tool.
@@ -106,7 +122,7 @@ approval), or, in a non-interactive run, the plan is recorded with its defaults 
 ### 5. Generate
 
 Load `references/codegen.md`. At approval, start the SDK install and the dev server as background
-tasks; write each tool module at its planned path and the entry module last. Descriptions ship
+tasks (`references/verify.md` → *Servers you start*); write each tool module at its planned path and the entry module last. Descriptions ship
 verbatim from the plan. A planned path that proves unusable, or any change to what a tool does, goes
 back to review before it is written (non-interactive: recorded beside the plan).
 
@@ -126,7 +142,9 @@ tool is fixed or dropped.
 
 Human runs, or a non-interactive run whose request asks for it (`references/non-interactive.md`).
 Load `references/connect.md`: offer Connect, then, after a healthy connection, the
-separate offer to publish the approved tool descriptions. Declining changes nothing about the tools.
+separate offer to publish the approved tool descriptions. Make the Connect offer as soon as
+verification is done, before any push, PR or other hand-over question, so a short reply such as
+"yes" cannot be read as the answer to a question asked ahead of it. Declining changes nothing about the tools.
 The SDK's anonymous usage observations run either way; Connect ties them to the developer's account.
 Every account step is a tool on the AgentLane MCP server that ships with this plugin, signed in once
 through the AI app; the kit has no login of its own. To read that account from the terminal

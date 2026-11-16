@@ -55,7 +55,9 @@ export async function main(args: string[], options: MainOptions = {}): Promise<n
   const json = args.includes("--json");
   if (command !== undefined && RETIRED.has(command)) {
     if (json)
-      io.stdout(JSON.stringify({ ok: false, error: { code: "moved_to_mcp", message: SIGN_IN_AGAIN } }));
+      io.stdout(
+        JSON.stringify({ ok: false, error: { code: "moved_to_mcp", message: SIGN_IN_AGAIN } }),
+      );
     else io.stderr(SIGN_IN_AGAIN);
     return 2;
   }

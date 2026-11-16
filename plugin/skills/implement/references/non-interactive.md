@@ -39,7 +39,7 @@ rollback rule and does not fail the run; the hand-over says what did not finish.
 
 ## Hand over
 
-Commit on the branch and open the PR as the flow describes. Its body, and the closing summary, carry:
+Commit on the branch and open the PR as the flow describes, with `.webmcp/connect.json` when Connect wrote it. Its body, and the closing summary, carry:
 
 1. the plan as recorded;
 2. every assumption: the question, the default taken, and why;

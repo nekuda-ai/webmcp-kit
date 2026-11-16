@@ -14,16 +14,16 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import {
-  MAX_JOURNAL_BYTES,
   appendDurable,
   isIsoTimestamp,
   isPlainObject,
   isUuid,
+  MAX_JOURNAL_BYTES,
   parseRecordedEnvelope,
   parseRunFile,
-  readRegularText,
   type RecordedEnvelope,
   type RunFileV1,
+  readRegularText,
 } from "./protocol";
 
 const [workspaceArgument, runId, eventId, ...extra] = process.argv.slice(2);
@@ -65,6 +65,7 @@ let ownLock = false;
 type LockOwner = { pid: number; nonce: string; created_at_ms: number };
 
 function stateDirIsReal(): boolean {
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     return lstatSync(stateDir).isDirectory() && !lstatSync(stateDir).isSymbolicLink();
   } catch {
@@ -75,10 +76,15 @@ function stateDirIsReal(): boolean {
 function writeExclusive(path: string, text: string): void {
   let fd: number | undefined;
   try {
-    fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o644);
+    fd = openSync(
+      path,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
+      0o644,
+    );
     const buffer = Buffer.from(text, "utf8");
     const written = writeSync(fd, buffer, 0, buffer.length);
-    if (written !== buffer.length) throw new Error(`short write (${written}/${buffer.length} bytes)`);
+    if (written !== buffer.length)
+      throw new Error(`short write (${written}/${buffer.length} bytes)`);
     fsyncSync(fd);
   } finally {
     if (fd !== undefined) closeSync(fd);
@@ -88,6 +94,7 @@ function writeExclusive(path: string, text: string): void {
 function lockOwnerAt(path: string): LockOwner | null {
   const text = readRegularText(path, 4096);
   if (text === null) return null;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const value = JSON.parse(text) as Record<string, unknown>;
     if (
@@ -140,6 +147,7 @@ async function acquireLock(): Promise<void> {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     } finally {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         unlinkSync(stage);
       } catch {
@@ -178,6 +186,7 @@ async function acquireLock(): Promise<void> {
       quarantined.nonce !== observed.nonce ||
       quarantined.created_at_ms !== observed.created_at_ms
     ) {
+      // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
       try {
         linkSync(stale, lockFile);
         unlinkSync(stale);
@@ -194,6 +203,7 @@ async function acquireLock(): Promise<void> {
 
 function releaseLock(): void {
   if (!ownLock || readRegularText(lockFile, 4096) !== ownLockText) return;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     unlinkSync(lockFile);
   } catch {
@@ -205,6 +215,7 @@ function releaseLock(): void {
 function currentRun(): RunFileV1 | null {
   const text = readRegularText(runFile, 16 * 1024);
   if (text === null) return null;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const run = parseRunFile(JSON.parse(text));
     return run?.workspace === workspace && run.run_id === runId ? run : null;
@@ -218,6 +229,7 @@ function canonicalEvent(): RecordedEnvelope | null {
   if (text === null) return null;
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       const envelope = parseRecordedEnvelope(JSON.parse(line));
       if (envelope?.run_id === runId && envelope.event_id === eventId) return envelope;
@@ -235,6 +247,7 @@ function submitBuildStarted(event: RecordedEnvelope): boolean {
   const entries: Array<Record<string, unknown>> = [];
   for (const line of status.split("\n")) {
     if (!line.trim()) continue;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       const value = JSON.parse(line) as unknown;
       if (isPlainObject(value)) entries.push(value);
@@ -262,12 +275,11 @@ function feedbackSourceMatchesReview(event: RecordedEnvelope): boolean {
   const planText = readRegularText(join(stateDir, "plan.json"), MAX_REVIEW_COPY_BYTES);
   if (planText === null) return false;
   let sourceModule: string | null = null;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const value = JSON.parse(planText) as unknown;
     if (!isPlainObject(value) || !Array.isArray(value.suggestions)) return false;
-    const planned = value.suggestions.find(
-      (item) => isPlainObject(item) && item.id === suggestion,
-    );
+    const planned = value.suggestions.find((item) => isPlainObject(item) && item.id === suggestion);
     if (
       !isPlainObject(planned) ||
       typeof planned.source_module !== "string" ||
@@ -284,6 +296,7 @@ function feedbackSourceMatchesReview(event: RecordedEnvelope): boolean {
   if (sourceModule === null) return false;
   const sourcePath = resolve(workspace, sourceModule);
   if (sourcePath === workspace || !sourcePath.startsWith(`${workspace}${sep}`)) return false;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     if (realpathSync(sourcePath) !== sourcePath) return false;
   } catch {
@@ -314,6 +327,7 @@ function approvalBrowserDeliveryIssue(event: RecordedEnvelope): string | null {
   const planText = readRegularText(join(stateDir, "plan.json"), MAX_REVIEW_COPY_BYTES);
   if (planText === null) return null;
   let entryModule: string;
+  // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
   try {
     const value = JSON.parse(planText) as unknown;
     if (!isPlainObject(value) || typeof value.entry_module !== "string") return null;
@@ -369,6 +383,7 @@ function acknowledgementExists(): boolean {
   if (text === null) return false;
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
+    // biome-ignore lint/plugin/swallowed-error: known violation, older than this rule
     try {
       const value = JSON.parse(line) as unknown;
       if (
